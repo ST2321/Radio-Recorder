@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>無線記録ソフト (結合ダウンロード対応版)</title>
+    <!-- JSZipライブラリ（一括ZIPダウンロード用） -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #cbd5e1;
+            --danger-color: #ef4444;
+            --success-color: #166534;
+        }
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .setting-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            font-size: 0.875rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        select, input[type="range"], button {
+            padding: 10px;
+            font-size: 1rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        select { background-color: #fff; }
+        .range-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .range-container input { flex: 1; }
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        button.secondary { background-color: #64748b; }
+        button.toggle-active { background-color: var(--danger-color); }
+        button:disabled { background-color: #94a3b8; cursor: not-allowed; }
+        .status {
+            font-weight: bold;
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background-color: #e2e8f0;
+            font-size: 0.875rem;
+        }
+        .status.active { background-color: #dcfce7; color: var(--success-color); }
+        .status.recording { background-color: #fee2e2; color: var(--danger-color); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .meter-box {
+            background: #e2e8f0;
+            border-radius: 4px;
+            height: 16px;
+            width: 100%;
+            overflow: hidden;
+            margin-top: 5px;
+            position: relative;
+        }
+        .meter-fill {
+            background: var(--primary-color);
+            height: 100%;
+            width: 0%;
+            transition: width 0.05s linear;
+        }
+        .meter-threshold {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 2px;
+            background: var(--danger-color);
+        }
+        .live-transcription-box {
+            background: #0f172a;
+            color: #38bdf8;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 1.1rem;
+            min-height: 40px;
+            max-height: 100px;
+            overflow-y: auto;
+            margin-top: 10px;
+            word-break: break-all;
+        }
+        .log-list-container {
+            max-height: 450px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: #fff;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        th {
+            background-color: #f8fafc;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .col-select { width: 45px; text-align: center; }
+        .col-time { width: 155px; white-space: nowrap; }
+        .col-duration { width: 85px; white-space: nowrap; }
+        .col-text { width: auto; }
+        .col-action { width: 140px; text-align: right; white-space: nowrap; }
+
+        .clickable-text {
+            cursor: pointer;
+            color: #1d4ed8;
+            text-decoration: underline dotted;
+        }
+        .clickable-text:hover {
+            color: #2563eb;
+            background-color: #eff6ff;
+        }
+
+        .batch-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .action-btns { 
+            display: flex; 
+            gap: 6px; 
+            justify-content: flex-end; 
+        }
+        .btn-sm { padding: 6px 12px; font-size: 0.85rem; border-radius: 4px; }
+        .btn-danger { background-color: var(--danger-color); }
+        
+        .player-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        .player-info {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #475569;
+        }
+        .player-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .player-controls input[type="range"] {
+            flex: 1;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>無線記録ソフト</h1>
+    </header>
+
+    <div class="card">
+        <h2>デバイス設定 & コントロール</h2>
+        
+        <div class="settings-grid">
+            <div class="setting-group">
+                <label for="audioSource">入力デバイス (有線マイク / オーディオI/F)</label>
+                <select id="audioSource">
+                    <option value="">「マイク接続を許可」を押してデバイスを読み込む</option>
+                </select>
+            </div>
+            
+            <div class="setting-group">
+                <label for="audioOutput">出力先スピーカー</label>
+                <select id="audioOutput">
+                    <option value="">既定のスピーカー</option>
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label for="monitorVolumeRange">モニタ音量調節: <span id="monitorVolumeValue">100%</span></label>
+                <div class="range-container">
+                    <span>0%</span>
+                    <input type="range" id="monitorVolumeRange" min="0" max="1" step="0.05" value="1">
+                    <span>100%</span>
+                </div>
+                <button id="monitorMuteBtn" class="secondary btn-sm" style="margin-top: 8px;">モニタ音：ON (切替)</button>
+            </div>
+
+            <div class="setting-group">
+                <label for="thresholdRange">音声検知感度 (しきい値): <span id="thresholdValue">0.010</span></label>
+                <div class="range-container">
+                    <span>高感度</span>
+                    <input type="range" id="thresholdRange" min="0.001" max="0.3" step="0.001" value="0.010">
+                    <span>低感度</span>
+                </div>
+            </div>
+
+            <div class="setting-group" style="grid-column: 1 / -1;">
+                <label>リアルタイム入力音量レベル（赤線：検知しきい値）</label>
+                <div class="meter-box">
+                    <div id="meterFill" class="meter-fill"></div>
+                    <div id="meterThreshold" class="meter-threshold" style="left: 0%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="initBtn">1. マイク接続を許可 (最初のみ)</button>
+            <button id="startBtn" disabled>2. 常時監視・自動録音開始</button>
+            <button id="stopBtn" class="secondary" disabled>監視の一時停止</button>
+        </div>
+        
+        <div style="margin-top: 15px;">
+            <p style="margin: 0;">ステータス: <span id="statusBadge" class="status">待機中</span></p>
+        </div>
+
+        <div style="margin-top: 15px;">
+            <label>リアルタイム文字起こしプレビュー:</label>
+            <div id="liveTranscription" class="live-transcription-box">（音声待機中... 音が閾値を超えると自動で録音と文字起こしが始まります）</div>
+        </div>
+    </div>
+
+    <!-- 音声再生プレビューカード -->
+    <div class="card" id="playerCard" style="display:none;">
+        <h2>音声再生プレビュー</h2>
+        <div class="player-panel">
+            <div id="playerInfoText" class="player-info">再生ファイル: 選択されていません</div>
+            <div class="player-controls">
+                <button id="playPauseBtn" class="btn-sm">一時停止</button>
+                <button id="stopPlayBtn" class="btn-sm secondary">停止</button>
+                <span id="currentTimeDisplay" style="font-family: monospace; font-size: 0.9rem;">0:00</span>
+                <input type="range" id="seekSlider" value="0" min="0" max="100" step="0.1">
+                <span id="durationDisplay" style="font-family: monospace; font-size: 0.9rem;">0:00</span>
+            </div>
+        </div>
+        <audio id="audioPlayer" style="display:none;"></audio>
+    </div>
+
+    <div class="card">
+        <h2>受信ログ一覧 (音声 ＆ 文字起こしセット)</h2>
+        <p style="font-size: 0.85rem; color: #64748b; margin-top: 0;">※ 3日経過したログは自動削除されます。</p>
+        
+        <div class="batch-actions">
+            <button id="batchPlayBtn" class="btn-sm secondary" disabled>選択項目を続けてプレビュー</button>
+            <button id="batchDownloadBtn" class="btn-sm" disabled>選択項目を【1つのファイルに結合して】ダウンロード(ZIP)</button>
+        </div>
+
+        <div class="log-list-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="col-select"><input type="checkbox" id="selectAllCheckbox" title="すべて選択"></th>
+                        <th class="col-time">検知日時</th>
+                        <th class="col-duration">録音時間</th>
+                        <th class="col-text">文字起こし内容 (クリックでその位置から再生)</th>
+                        <th class="col-action">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="logTableBody">
+                    <tr id="emptyRow">
+                        <td colspan="5" style="text-align: center; color: #64748b; padding: 20px;">
+                            まだログがありません。「常時監視・自動録音開始」を押して音声を待ち受けてください。
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let mediaStream = null;
+    let audioContext = null;
+    let sourceNode = null;
+    let processorNode = null;
+    let monitorGainNode = null;
+    let recognition = null;
+    let isRunning = false;
+    let sampleRate = 44100;
+
+    let preBuffer = []; 
+    let activeRecordingChunks = []; 
+    let isRecordingAudio = false;
+    let silenceTimer = null;
+    let currentTranscriptBuffer = "";
+    let interimTranscriptBuffer = "";
+    let isMonitorMuted = false;
+    let recordingStartTime = 0;
+    let previousMonitorState = false;
+
+    let logDatabase = [];
+
+    const initBtn = document.getElementById('initBtn');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const audioSourceSelect = document.getElementById('audioSource');
+    const audioOutputSelect = document.getElementById('audioOutput');
+    const statusBadge = document.getElementById('statusBadge');
+    const liveTranscription = document.getElementById('liveTranscription');
+    const logTableBody = document.getElementById('logTableBody');
+    const emptyRow = document.getElementById('emptyRow');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const batchPlayBtn = document.getElementById('batchPlayBtn');
+    const batchDownloadBtn = document.getElementById('batchDownloadBtn');
+    
+    const audioPlayer = document.getElementById('audioPlayer');
+    const playerCard = document.getElementById('playerCard');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const stopPlayBtn = document.getElementById('stopPlayBtn');
+    const seekSlider = document.getElementById('seekSlider');
+    const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+    const durationDisplay = document.getElementById('durationDisplay');
+    const playerInfoText = document.getElementById('playerInfoText');
+
+    const thresholdRange = document.getElementById('thresholdRange');
+    const thresholdValue = document.getElementById('thresholdValue');
+    const meterFill = document.getElementById('meterFill');
+    const meterThreshold = document.getElementById('meterThreshold');
+    
+    const monitorVolumeRange = document.getElementById('monitorVolumeRange');
+    const monitorVolumeValue = document.getElementById('monitorVolumeValue');
+    const monitorMuteBtn = document.getElementById('monitorMuteBtn');
+
+    let soundThreshold = parseFloat(thresholdRange.value);
+    const METER_SCALE_MAX = 0.3; 
+
+    function updateThresholdIndicator() {
+        const meterPercent = (soundThreshold / METER_SCALE_MAX) * 100;
+        meterThreshold.style.left = `${Math.min(Math.max(meterPercent, 0), 100)}%`;
+    }
+    updateThresholdIndicator();
+
+    thresholdRange.addEventListener('input', (e) => {
+        soundThreshold = parseFloat(e.target.value);
+        thresholdValue.textContent = soundThreshold.toFixed(3);
+        updateThresholdIndicator();
+    });
+
+    monitorVolumeRange.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        monitorVolumeValue.textContent = `${Math.round(val * 100)}%`;
+        if (monitorGainNode && audioContext) {
+            monitorGainNode.gain.setValueAtTime(isMonitorMuted ? 0 : val, audioContext.currentTime);
+        }
+    });
+
+    monitorMuteBtn.addEventListener('click', () => {
+        isMonitorMuted = !isMonitorMuted;
+        if (monitorGainNode && audioContext) {
+            monitorGainNode.gain.setValueAtTime(isMonitorMuted ? 0 : parseFloat(monitorVolumeRange.value), audioContext.currentTime);
+        }
+        monitorMuteBtn.textContent = isMonitorMuted ? 'モニタ音：OFF (切替)' : 'モニタ音：ON (切替)';
+        monitorMuteBtn.classList.toggle('toggle-active', isMonitorMuted);
+    });
+
+    // マイク許可＆パイプラインの初期化（一度だけ実行）
+    initBtn.addEventListener('click', async () => {
+        try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } 
+            });
+            await updateDeviceLists();
+            
+            // AudioContextを作成し、一度構築したら維持する
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            sampleRate = audioContext.sampleRate;
+
+            sourceNode = audioContext.createMediaStreamSource(mediaStream);
+            processorNode = audioContext.createScriptProcessor(2048, 1, 1);
+            monitorGainNode = audioContext.createGain();
+
+            const initialVol = isMonitorMuted ? 0 : parseFloat(monitorVolumeRange.value);
+            monitorGainNode.gain.setValueAtTime(initialVol, audioContext.currentTime);
+
+            processorNode.onaudioprocess = processAudioData;
+
+            sourceNode.connect(processorNode);
+            processorNode.connect(audioContext.destination);
+
+            sourceNode.connect(monitorGainNode);
+            monitorGainNode.connect(audioContext.destination);
+
+            // 待機状態にしておく
+            await audioContext.suspend();
+
+            if (!recognition) {
+                recognition = initSpeechRecognition();
+            }
+
+            statusBadge.textContent = '準備完了';
+            initBtn.disabled = true;
+            startBtn.disabled = false;
+        } catch (err) {
+            alert('マイクの許可が得られなかったか、デバイスが見つかりません。');
+        }
+    });
+
+    async function updateDeviceLists() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const currentSource = audioSourceSelect.value;
+        
+        audioSourceSelect.innerHTML = '';
+        audioOutputSelect.innerHTML = '<option value="">既定のスピーカー</option>';
+
+        devices.forEach(device => {
+            if (device.kind === 'audioinput') {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.text = device.label || `入力デバイス ${audioSourceSelect.length + 1}`;
+                audioSourceSelect.appendChild(option);
+            } else if (device.kind === 'audiooutput') {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.text = device.label || `出力デバイス ${audioOutputSelect.length + 1}`;
+                audioOutputSelect.appendChild(option);
+            }
+        });
+
+        if (currentSource) audioSourceSelect.value = currentSource;
+    }
+
+    // オーディオプロセスの中身（常時監視中のみ動作）
+    function processAudioData(e) {
+        if (!isRunning) return;
+
+        const inputData = e.inputBuffer.getChannelData(0);
+        const chunkCopy = new Float32Array(inputData);
+
+        let sum = 0;
+        for (let i = 0; i < chunkCopy.length; i++) {
+            sum += chunkCopy[i] * chunkCopy[i];
+        }
+        let rms = Math.sqrt(sum / chunkCopy.length);
+
+        let percent = Math.min((rms / METER_SCALE_MAX) * 100, 100);
+        meterFill.style.width = `${percent}%`;
+
+        preBuffer.push(chunkCopy);
+        if (preBuffer.length > 45) {
+            preBuffer.shift();
+        }
+
+        if (rms >= soundThreshold) {
+            if (!isRecordingAudio) {
+                isRecordingAudio = true;
+                activeRecordingChunks = [...preBuffer];
+                recordingStartTime = Date.now();
+                statusBadge.textContent = '音声検知・録音中...';
+                statusBadge.className = 'status recording';
+            }
+            if (silenceTimer) {
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+            }
+        } else {
+            if (isRecordingAudio && !silenceTimer) {
+                silenceTimer = setTimeout(() => {
+                    if (isRecordingAudio) {
+                        isRecordingAudio = false;
+
+                        statusBadge.textContent = '常時監視中';
+                        statusBadge.className = 'status active';
+
+                        const nowEpoch = Date.now();
+                        const timeStr = new Date(nowEpoch).toLocaleString();
+                        const durationSec = (nowEpoch - recordingStartTime) / 1000;
+                        const wavBlob = createWavBlob(activeRecordingChunks, sampleRate);
+                        
+                        const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
+                        addLogEntry(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
+
+                        currentTranscriptBuffer = "";
+                        interimTranscriptBuffer = "";
+                        liveTranscription.textContent = '（音声待機中... 音が閾値を超えると自動で録音と文字起こしが始まります）';
+
+                        activeRecordingChunks = [];
+                        silenceTimer = null;
+                    }
+                }, 3000);
+            }
+        }
+
+        if (isRecordingAudio) {
+            activeRecordingChunks.push(chunkCopy);
+        }
+
+        // 監視用プロセッサからの出力はミュート（スピーカーからループさせないため）
+        const outputData = e.outputBuffer.getChannelData(0);
+        for (let i = 0; i < inputData.length; i++) {
+            outputData[i] = 0; 
+        }
+    }
+
+    function createWavBlob(chunks, sampleRate) {
+        let totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+        let buffer = new Float32Array(totalLength);
+        let offset = 0;
+        for (let chunk of chunks) {
+            buffer.set(chunk, offset);
+            offset += chunk.length;
+        }
+        let wavBuffer = interleaveAndEncodeWAV(buffer, sampleRate);
+        return new Blob([wavBuffer], { type: 'audio/wav' });
+    }
+
+    function interleaveAndEncodeWAV(inputSamples, sampleRate) {
+        let buffer = new ArrayBuffer(44 + inputSamples.length * 2);
+        let view = new DataView(buffer);
+
+        writeString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + inputSamples.length * 2, true);
+        writeString(view, 8, 'WAVE');
+        writeString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeString(view, 36, 'data');
+        view.setUint32(40, inputSamples.length * 2, true);
+
+        let index = 44;
+        for (let i = 0; i < inputSamples.length; i++, index += 2) {
+            let s = Math.max(-1, Math.min(1, inputSamples[i]));
+            view.setInt16(index, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        }
+        return buffer;
+    }
+
+    function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    }
+
+    // 複数WAVの結合処理関数
+    async function combineWavBlobs(blobs) {
+        if (blobs.length === 0) return null;
+        let totalAudioLen = 0;
+        const buffers = [];
+        
+        for (let i = 0; i < blobs.length; i++) {
+            const arrayBuffer = await blobs[i].arrayBuffer();
+            const audioData = new Uint8Array(arrayBuffer, 44);
+            buffers.push(audioData);
+            totalAudioLen += audioData.length;
+        }
+
+        const outBuffer = new Uint8Array(44 + totalAudioLen);
+        const view = new DataView(outBuffer.buffer);
+
+        writeString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + totalAudioLen, true);
+        writeString(view, 8, 'WAVE');
+        writeString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeString(view, 36, 'data');
+        view.setUint32(40, totalAudioLen, true);
+
+        let offset = 44;
+        for (let buf of buffers) {
+            outBuffer.set(buf, offset);
+            offset += buf.length;
+        }
+        return new Blob([outBuffer], { type: 'audio/wav' });
+    }
+
+    function formatDuration(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = (seconds % 60).toFixed(1);
+        return `${mins > 0 ? mins + '分 ' : ''}${secs}秒`;
+    }
+
+    function formatTimeCode(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    function handleAudioPlayStart() {
+        previousMonitorState = isMonitorMuted;
+        isMonitorMuted = true;
+        if (monitorGainNode && audioContext) {
+            monitorGainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        }
+        playPauseBtn.textContent = '一時停止';
+    }
+
+    function handleAudioPlayEnd() {
+        isMonitorMuted = previousMonitorState;
+        if (monitorGainNode && audioContext) {
+            monitorGainNode.gain.setValueAtTime(isMonitorMuted ? 0 : parseFloat(monitorVolumeRange.value), audioContext.currentTime);
+        }
+        playPauseBtn.textContent = '再生';
+    }
+
+    audioPlayer.onplay = handleAudioPlayStart;
+    audioPlayer.onpause = () => {
+        playPauseBtn.textContent = '再生';
+        handleAudioPlayEnd();
+    };
+    audioPlayer.onended = () => {
+        playPauseBtn.textContent = '再生';
+        audioPlayer.currentTime = 0;
+        handleAudioPlayEnd();
+        
+        if (window.playlistQueue && window.playlistQueue.length > 0) {
+            const nextItem = window.playlistQueue.shift();
+            loadAndPlayAudio(nextItem.url, nextItem.title, 0);
+        }
+    };
+
+    audioPlayer.ontimeupdate = () => {
+        if (!isNaN(audioPlayer.duration)) {
+            currentTimeDisplay.textContent = formatTimeCode(audioPlayer.currentTime);
+            seekSlider.value = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+        }
+    };
+
+    audioPlayer.onloadedmetadata = () => {
+        durationDisplay.textContent = formatTimeCode(audioPlayer.duration);
+    };
+
+    seekSlider.addEventListener('input', () => {
+        if (!isNaN(audioPlayer.duration)) {
+            audioPlayer.currentTime = (seekSlider.value / 100) * audioPlayer.duration;
+        }
+    });
+
+    playPauseBtn.onclick = () => {
+        if (audioPlayer.paused) audioPlayer.play().catch(e => {});
+        else audioPlayer.pause();
+    };
+
+    stopPlayBtn.onclick = () => {
+        window.playlistQueue = [];
+        audioPlayer.pause();
+        audioPlayer.currentTime = 0;
+        handleAudioPlayEnd();
+    };
+
+    async function loadAndPlayAudio(audioUrl, titleText, startSec = 0) {
+        playerCard.style.display = 'block';
+        playerInfoText.textContent = `再生中: ${titleText}`;
+        if (audioPlayer.src !== audioUrl) {
+            audioPlayer.src = audioUrl;
+            audioPlayer.load();
+            const selectedOutput = audioOutputSelect.value;
+            if (selectedOutput && typeof audioPlayer.setSinkId === 'function') {
+                try { await audioPlayer.setSinkId(selectedOutput); } catch (e) {}
+            }
+        }
+        audioPlayer.currentTime = Math.max(0, startSec);
+        audioPlayer.play().catch(e => alert('音声の再生に失敗しました。'));
+    }
+
+    function cleanOldLogs() {
+        const now = Date.now();
+        const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+        
+        logDatabase = logDatabase.filter(item => {
+            const isAlive = (now - item.timestampEpoch) <= THREE_DAYS_MS;
+            if (!isAlive && item.audioUrl) {
+                URL.revokeObjectURL(item.audioUrl);
+            }
+            return isAlive;
+        });
+        renderLogTable();
+    }
+
+    function updateBatchButtonStates() {
+        const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
+        const hasChecked = checkedBoxes.length > 0;
+        batchPlayBtn.disabled = !hasChecked;
+        batchDownloadBtn.disabled = !hasChecked;
+    }
+
+    selectAllCheckbox.addEventListener('change', (e) => {
+        const checkboxes = document.querySelectorAll('.row-checkbox');
+        checkboxes.forEach(cb => cb.checked = e.target.checked);
+        updateBatchButtonStates();
+    });
+
+    function renderLogTable() {
+        logTableBody.innerHTML = '';
+        if (logDatabase.length === 0) {
+            logTableBody.appendChild(emptyRow);
+            selectAllCheckbox.checked = false;
+            updateBatchButtonStates();
+            return;
+        }
+
+        logDatabase.forEach((logItem, index) => {
+            const tr = document.createElement('tr');
+            
+            const tdSelect = document.createElement('td');
+            tdSelect.className = 'col-select';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'row-checkbox';
+            checkbox.dataset.index = index;
+            checkbox.onchange = () => {
+                updateBatchButtonStates();
+                const all = document.querySelectorAll('.row-checkbox');
+                const checkedAll = document.querySelectorAll('.row-checkbox:checked');
+                selectAllCheckbox.checked = all.length === checkedAll.length;
+            };
+            tdSelect.appendChild(checkbox);
+            tr.appendChild(tdSelect);
+
+            const tdTime = document.createElement('td');
+            tdTime.className = 'col-time';
+            tdTime.textContent = logItem.timestampStr;
+            tr.appendChild(tdTime);
+
+            const tdDuration = document.createElement('td');
+            tdDuration.className = 'col-duration';
+            tdDuration.textContent = formatDuration(logItem.durationSec);
+            tr.appendChild(tdDuration);
+
+            const tdText = document.createElement('td');
+            tdText.className = 'col-text';
+            
+            if (logItem.text && logItem.text.trim() !== '') {
+                const words = logItem.text.split('');
+                words.forEach((char, charIdx) => {
+                    const span = document.createElement('span');
+                    span.textContent = char;
+                    span.className = 'clickable-text';
+                    span.title = 'クリックした位置から再生';
+                    span.onclick = () => {
+                        const ratio = charIdx / words.length;
+                        let targetSec = (ratio * logItem.durationSec * 0.9) - 1.5;
+                        if (targetSec < 0) targetSec = 0;
+                        
+                        window.playlistQueue = [];
+                        loadAndPlayAudio(logItem.audioUrl, `${logItem.timestampStr} (${formatDuration(logItem.durationSec)})`, targetSec);
+                    };
+                    tdText.appendChild(span);
+                });
+            } else {
+                tdText.textContent = '（音声のみ検出・テキスト化なし）';
+            }
+            tr.appendChild(tdText);
+
+            const tdAction = document.createElement('td');
+            tdAction.className = 'col-action';
+
+            const actionDiv = document.createElement('div');
+            actionDiv.className = 'action-btns';
+
+            const playBtn = document.createElement('button');
+            playBtn.className = 'btn-sm secondary';
+            playBtn.textContent = '再生';
+            playBtn.onclick = () => {
+                window.playlistQueue = [];
+                loadAndPlayAudio(logItem.audioUrl, `${logItem.timestampStr} (${formatDuration(logItem.durationSec)})`, 0);
+            };
+            actionDiv.appendChild(playBtn);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-sm btn-danger';
+            deleteBtn.textContent = '削除';
+            deleteBtn.onclick = () => {
+                URL.revokeObjectURL(logItem.audioUrl);
+                logDatabase.splice(index, 1);
+                renderLogTable();
+            };
+            actionDiv.appendChild(deleteBtn);
+
+            tdAction.appendChild(actionDiv);
+            tr.appendChild(tdAction);
+
+            logTableBody.appendChild(tr);
+        });
+        updateBatchButtonStates();
+    }
+
+    batchPlayBtn.onclick = () => {
+        const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
+        if (checkedBoxes.length === 0) return;
+
+        let selectedItems = Array.from(checkedBoxes).map(cb => logDatabase[parseInt(cb.dataset.index)]);
+        selectedItems.sort((a, b) => a.timestampEpoch - b.timestampEpoch);
+
+        const queue = selectedItems.map(item => ({
+            url: item.audioUrl,
+            title: `${item.timestampStr} (${formatDuration(item.durationSec)})`
+        }));
+
+        if (queue.length > 0) {
+            const first = queue.shift();
+            window.playlistQueue = queue;
+            loadAndPlayAudio(first.url, first.title, 0);
+        }
+    };
+
+    batchDownloadBtn.onclick = async () => {
+        const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
+        if (checkedBoxes.length === 0) return;
+
+        batchDownloadBtn.disabled = true;
+        batchDownloadBtn.textContent = '結合ファイルを作成中...';
+
+        try {
+            let selectedItems = Array.from(checkedBoxes).map(cb => logDatabase[parseInt(cb.dataset.index)]);
+            selectedItems.sort((a, b) => a.timestampEpoch - b.timestampEpoch);
+
+            const audioBlobs = selectedItems.map(item => item.audioBlob);
+            const combinedAudioBlob = await combineWavBlobs(audioBlobs);
+            const combinedArrayBuffer = await combinedAudioBlob.arrayBuffer();
+
+            let combinedText = "【結合された無線ログ】\n====================\n\n";
+            selectedItems.forEach(item => {
+                combinedText += `■ 検知日時: ${item.timestampStr} (録音: ${formatDuration(item.durationSec)})\n`;
+                combinedText += `${item.text || '（音声のみ）'}\n\n`;
+            });
+
+            const zip = new JSZip();
+            const safeTimeStr = new Date().toISOString().replace(/[-:T]/g, '_').slice(0, 15);
+            zip.file(`combined_audio_${safeTimeStr}.wav`, combinedArrayBuffer);
+            zip.file(`combined_transcript_${safeTimeStr}.txt`, combinedText);
+
+            const content = await zip.generateAsync({ type: "blob" });
+            const downloadUrl = URL.createObjectURL(content);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `wireless_combined_logs_${safeTimeStr}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(downloadUrl);
+
+        } catch (err) {
+            alert('ファイルの結合・生成に失敗しました: ' + err.message);
+        } finally {
+            batchDownloadBtn.disabled = false;
+            batchDownloadBtn.textContent = '選択項目を【1つのファイルに結合して】ダウンロード(ZIP)';
+        }
+    };
+
+    function addLogEntry(timestampEpoch, timestampStr, durationSec, text, audioBlob) {
+        const audioUrl = URL.createObjectURL(audioBlob);
+        logDatabase.unshift({
+            timestampEpoch,
+            timestampStr,
+            durationSec,
+            text,
+            audioBlob,
+            audioUrl
+        });
+        cleanOldLogs();
+    }
+
+    function initSpeechRecognition() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) return null;
+
+        const rec = new SpeechRecognition();
+        rec.lang = 'ja-JP';
+        rec.continuous = true;
+        rec.interimResults = true;
+
+        rec.onresult = (event) => {
+            let interim = '';
+            let final = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    final += event.results[i][0].transcript;
+                } else {
+                    interim += event.results[i][0].transcript;
+                }
+            }
+
+            if (final.trim() !== '') {
+                currentTranscriptBuffer += final;
+            }
+            interimTranscriptBuffer = interim;
+            
+            const displayFullText = currentTranscriptBuffer + interimTranscriptBuffer;
+            if (displayFullText.trim() !== '') {
+                liveTranscription.textContent = displayFullText;
+            }
+        };
+
+        rec.onend = () => {
+            if (isRunning) {
+                setTimeout(() => {
+                    if (isRunning) {
+                        try { rec.start(); } catch (e) {}
+                    }
+                }, 250);
+            }
+        };
+        return rec;
+    }
+
+    startBtn.addEventListener('click', async () => {
+        try {
+            if (!audioContext) {
+                alert("最初に「マイク接続を許可」ボタンを押してください。");
+                return;
+            }
+            
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+
+            isRunning = true;
+            if (recognition) {
+                try { recognition.start(); } catch (e) {}
+            }
+
+            statusBadge.textContent = '常時監視中';
+            statusBadge.classList.add('active');
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+
+        } catch (err) {
+            alert(`開始に失敗しました: ${err.message}`);
+        }
+    });
+
+    stopBtn.addEventListener('click', async () => {
+        isRunning = false;
+        if (silenceTimer) {
+            clearTimeout(silenceTimer);
+            silenceTimer = null;
+        }
+
+        if (isRecordingAudio) {
+            isRecordingAudio = false;
+            if (activeRecordingChunks.length > 0) {
+                const nowEpoch = Date.now();
+                const timeStr = new Date(nowEpoch).toLocaleString();
+                const durationSec = (nowEpoch - recordingStartTime) / 1000;
+                const wavBlob = createWavBlob(activeRecordingChunks, sampleRate);
+                const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
+                addLogEntry(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
+            }
+        }
+
+        if (recognition) {
+            try { recognition.stop(); } catch(e) {}
+        }
+        
+        if (audioContext && audioContext.state === 'running') {
+            await audioContext.suspend();
+        }
+
+        statusBadge.textContent = '待機中';
+        statusBadge.className = 'status';
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        liveTranscription.textContent = '（停止中）';
+        meterFill.style.width = '0%';
+    });
+
+    cleanOldLogs();
+</script>
+
+</body>
+</html>
