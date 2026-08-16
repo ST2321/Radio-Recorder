@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>無線記録ソフト</title>
+    <title>無線記録ソフト (バックグラウンド完全対応版)</title>
     <!-- JSZipライブラリ（一括ZIPダウンロード用） -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
@@ -158,6 +158,17 @@
             position: sticky;
             top: 0;
             z-index: 10;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+        th:hover {
+            background-color: #e2e8f0;
+        }
+        th .sort-icon {
+            font-size: 0.8rem;
+            margin-left: 4px;
+            color: #64748b;
         }
         
         .col-select { width: 45px; text-align: center; }
@@ -257,7 +268,7 @@
                 <label for="thresholdRange">音声検知感度 (しきい値): <span id="thresholdValue">0.010</span></label>
                 <div class="range-container">
                     <span>高感度</span>
-                    <input type="range" id="thresholdRange" min="0.001" max="0.3" step="0.001" value="0.008">
+                    <input type="range" id="thresholdRange" min="0.001" max="0.3" step="0.001" value="0.010">
                     <span>低感度</span>
                 </div>
             </div>
@@ -305,7 +316,7 @@
 
     <div class="card">
         <h2>受信ログ一覧 (音声 ＆ 文字起こしセット)</h2>
-        <p style="font-size: 0.85rem; color: #64748b; margin-top: 0;">※ 3日経過したログは自動削除されます。</p>
+        <p style="font-size: 0.85rem; color: #64748b; margin-top: 0;">※ 3日経過したログは自動削除されます。ヘッダーをクリックすると各列でソートできます。</p>
         
         <div class="batch-actions">
             <button id="batchPlayBtn" class="btn-sm secondary" disabled>選択項目を続けてプレビュー</button>
@@ -317,9 +328,9 @@
                 <thead>
                     <tr>
                         <th class="col-select"><input type="checkbox" id="selectAllCheckbox" title="すべて選択"></th>
-                        <th class="col-time">検知日時</th>
-                        <th class="col-duration">録音時間</th>
-                        <th class="col-text">文字起こし内容 (クリックでその位置から再生)</th>
+                        <th class="col-time" data-sort="time">検知日時 <span class="sort-icon">↕</span></th>
+                        <th class="col-duration" data-sort="duration">録音時間 <span class="sort-icon">↕</span></th>
+                        <th class="col-text" data-sort="text">文字起こし内容 (クリックでその位置から再生) <span class="sort-icon">↕</span></th>
                         <th class="col-action">操作</th>
                     </tr>
                 </thead>
@@ -356,6 +367,8 @@
     let previousMonitorState = false;
 
     let logDatabase = [];
+    let currentSortColumn = null;
+    let currentSortAscending = true;
 
     const initBtn = document.getElementById('initBtn');
     const startBtn = document.getElementById('startBtn');
@@ -526,14 +539,16 @@
                         statusBadge.className = 'status active';
 
                         const nowEpoch = Date.now();
-                        const timeStr = new Date(nowEpoch).toLocaleString();
                         const durationSec = (nowEpoch - recordingStartTime) / 1000;
-                        const wavBlob = createWavBlob(activeRecordingChunks, sampleRate);
                         
-                        const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
-                        addLogEntry(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
+                        // 【追加機能】録音時間が5秒未満のものはノイズとして保存しない
+                        if (durationSec >= 5.0) {
+                            const timeStr = new Date(nowEpoch).toLocaleString();
+                            const wavBlob = createWavBlob(activeRecordingChunks, sampleRate);
+                            const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
+                            addLogEntry(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
+                        }
 
-                        currentTimestampBuffer = "";
                         currentTranscriptBuffer = "";
                         interimTranscriptBuffer = "";
                         liveTranscription.textContent = '（音声待機中... 音が閾値を超えると自動で録音と文字起こしが始まります）';
@@ -752,6 +767,55 @@
         updateBatchButtonStates();
     });
 
+    // 【追加機能】テーブルのソート機能
+    function sortLogData(column) {
+        if (currentSortColumn === column) {
+            currentSortAscending = !currentSortAscending;
+        } else {
+            currentSortColumn = column;
+            currentSortAscending = true;
+        }
+
+        logDatabase.sort((a, b) => {
+            let valA, valB;
+            if (column === 'time') {
+                valA = a.timestampEpoch;
+                valB = b.timestampEpoch;
+            } else if (column === 'duration') {
+                valA = a.durationSec;
+                valB = b.durationSec;
+            } else if (column === 'text') {
+                valA = (a.text || '').toLowerCase();
+                valB = (b.text || '').toLowerCase();
+            }
+
+            if (valA < valB) return currentSortAscending ? -1 : 1;
+            if (valA > valB) return currentSortAscending ? 1 : -1;
+            return 0;
+        });
+
+        renderLogTable();
+        updateSortIcons();
+    }
+
+    function updateSortIcons() {
+        document.querySelectorAll('th[data-sort]').forEach(th => {
+            const icon = th.querySelector('.sort-icon');
+            const col = th.dataset.sort;
+            if (col === currentSortColumn) {
+                icon.textContent = currentSortAscending ? ' ▲' : ' ▼';
+            } else {
+                icon.textContent = ' ↕';
+            }
+        });
+    }
+
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            sortLogData(th.dataset.sort);
+        });
+    });
+
     function renderLogTable() {
         logTableBody.innerHTML = '';
         if (logDatabase.length === 0) {
@@ -834,7 +898,10 @@
             deleteBtn.textContent = '削除';
             deleteBtn.onclick = () => {
                 URL.revokeObjectURL(logItem.audioUrl);
-                logDatabase.splice(index, 1);
+                const realIndex = logDatabase.indexOf(logItem);
+                if (realIndex > -1) {
+                    logDatabase.splice(realIndex, 1);
+                }
                 renderLogTable();
             };
             actionDiv.appendChild(deleteBtn);
@@ -856,7 +923,7 @@
 
         const queue = selectedItems.map(item => ({
             url: item.audioUrl,
-            title: `${item.timestampStr} (${formatDuration(item.durationSec)})`
+            title: `${item.timestampStr} (${formatDuration(logItem.durationSec)})` // 修正: item.durationSec
         }));
 
         if (queue.length > 0) {
@@ -1003,11 +1070,15 @@
             isRecordingAudio = false;
             if (activeRecordingChunks.length > 0) {
                 const nowEpoch = Date.now();
-                const timeStr = new Date(nowEpoch).toLocaleString();
                 const durationSec = (nowEpoch - recordingStartTime) / 1000;
-                const wavBlob = createWavBlob(activeRecordingChunks, sampleRate);
-                const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
-                addLogEntry(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
+                
+                // 停止時も5秒未満のものは破棄
+                if (durationSec >= 5.0) {
+                    const timeStr = new Date(nowEpoch).toLocaleString();
+                    const wavBlob = createWavBlob(activeRecordingChunks, sampleRate);
+                    const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
+                    addLogEntry(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
+                }
             }
         }
 
