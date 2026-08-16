@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>無線記録ソフト (結合ダウンロード対応版)</title>
+    <title>無線記録ソフト</title>
     <!-- JSZipライブラリ（一括ZIPダウンロード用） -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
@@ -420,7 +420,7 @@
         monitorMuteBtn.classList.toggle('toggle-active', isMonitorMuted);
     });
 
-    // マイク許可＆パイプラインの初期化（一度だけ実行）
+    // マイク許可＆パイプラインの初期化
     initBtn.addEventListener('click', async () => {
         try {
             mediaStream = await navigator.mediaDevices.getUserMedia({ 
@@ -428,7 +428,6 @@
             });
             await updateDeviceLists();
             
-            // AudioContextを作成し、一度構築したら維持する
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             sampleRate = audioContext.sampleRate;
 
@@ -447,7 +446,6 @@
             sourceNode.connect(monitorGainNode);
             monitorGainNode.connect(audioContext.destination);
 
-            // 待機状態にしておく
             await audioContext.suspend();
 
             if (!recognition) {
@@ -486,7 +484,6 @@
         if (currentSource) audioSourceSelect.value = currentSource;
     }
 
-    // オーディオプロセスの中身（常時監視中のみ動作）
     function processAudioData(e) {
         if (!isRunning) return;
 
@@ -536,6 +533,7 @@
                         const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
                         addLogEntry(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
 
+                        currentTimestampBuffer = "";
                         currentTranscriptBuffer = "";
                         interimTranscriptBuffer = "";
                         liveTranscription.textContent = '（音声待機中... 音が閾値を超えると自動で録音と文字起こしが始まります）';
@@ -551,7 +549,6 @@
             activeRecordingChunks.push(chunkCopy);
         }
 
-        // 監視用プロセッサからの出力はミュート（スピーカーからループさせないため）
         const outputData = e.outputBuffer.getChannelData(0);
         for (let i = 0; i < inputData.length; i++) {
             outputData[i] = 0; 
@@ -602,7 +599,6 @@
         }
     }
 
-    // 複数WAVの結合処理関数
     async function combineWavBlobs(blobs) {
         if (blobs.length === 0) return null;
         let totalAudioLen = 0;
@@ -964,7 +960,7 @@
                     if (isRunning) {
                         try { rec.start(); } catch (e) {}
                     }
-                }, 250);
+                }, 500);
             }
         };
         return rec;
