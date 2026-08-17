@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>無線記録ソフト (バックグラウンド完全対応版)</title>
+    <title>無線受信記録ソフト</title>
     <!-- JSZipライブラリ（一括ZIPダウンロード用） -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
@@ -15,6 +15,7 @@
             --border-color: #cbd5e1;
             --danger-color: #ef4444;
             --success-color: #166534;
+            --line-color: #06c755;
         }
         body {
             font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -87,6 +88,7 @@
         button:hover { opacity: 0.9; }
         button.secondary { background-color: #64748b; }
         button.toggle-active { background-color: var(--danger-color); }
+        button.btn-line { background-color: var(--line-color); }
         button:disabled { background-color: #94a3b8; cursor: not-allowed; }
         .status {
             font-weight: bold;
@@ -160,22 +162,15 @@
             z-index: 10;
             cursor: pointer;
             user-select: none;
-            transition: background-color 0.2s;
         }
-        th:hover {
-            background-color: #e2e8f0;
-        }
-        th .sort-icon {
-            font-size: 0.8rem;
-            margin-left: 4px;
-            color: #64748b;
-        }
+        th:hover { background-color: #e2e8f0; }
+        th .sort-icon { font-size: 0.8rem; color: #64748b; margin-left: 4px; }
         
         .col-select { width: 45px; text-align: center; }
-        .col-time { width: 155px; white-space: nowrap; }
+        .col-time { width: 150px; white-space: nowrap; }
         .col-duration { width: 85px; white-space: nowrap; }
         .col-text { width: auto; }
-        .col-action { width: 140px; text-align: right; white-space: nowrap; }
+        .col-action { width: 210px; text-align: right; white-space: nowrap; }
 
         .clickable-text {
             cursor: pointer;
@@ -197,10 +192,11 @@
 
         .action-btns { 
             display: flex; 
-            gap: 6px; 
+            gap: 4px; 
             justify-content: flex-end; 
+            flex-wrap: nowrap;
         }
-        .btn-sm { padding: 6px 12px; font-size: 0.85rem; border-radius: 4px; }
+        .btn-sm { padding: 6px 10px; font-size: 0.8rem; border-radius: 4px; }
         .btn-danger { background-color: var(--danger-color); }
         
         .player-panel {
@@ -233,7 +229,7 @@
 
 <div class="container">
     <header>
-        <h1>無線記録ソフト</h1>
+        <h1>無線受信記録ソフト</h1>
     </header>
 
     <div class="card">
@@ -241,9 +237,9 @@
         
         <div class="settings-grid">
             <div class="setting-group">
-                <label for="audioSource">入力デバイス (有線マイク / オーディオI/F)</label>
+                <label for="audioSource">入力デバイス</label>
                 <select id="audioSource">
-                    <option value="">「マイク接続を許可」を押してデバイスを読み込む</option>
+                    <option value="">デバイスを読み込む</option>
                 </select>
             </div>
             
@@ -254,6 +250,16 @@
                 </select>
             </div>
 
+            <!-- 音声検知感度とモニタ音量調節の配置を入れ替えました -->
+            <div class="setting-group">
+                <label for="thresholdRange">音声検知感度: <span id="thresholdValue">0.010</span></label>
+                <div class="range-container">
+                    <span>高</span>
+                    <input type="range" id="thresholdRange" min="0.001" max="0.3" step="0.001" value="0.010">
+                    <span>低</span>
+                </div>
+            </div>
+
             <div class="setting-group">
                 <label for="monitorVolumeRange">モニタ音量調節: <span id="monitorVolumeValue">100%</span></label>
                 <div class="range-container">
@@ -261,20 +267,11 @@
                     <input type="range" id="monitorVolumeRange" min="0" max="1" step="0.05" value="1">
                     <span>100%</span>
                 </div>
-                <button id="monitorMuteBtn" class="secondary btn-sm" style="margin-top: 8px;">モニタ音：ON (切替)</button>
-            </div>
-
-            <div class="setting-group">
-                <label for="thresholdRange">音声検知感度 (しきい値): <span id="thresholdValue">0.010</span></label>
-                <div class="range-container">
-                    <span>高感度</span>
-                    <input type="range" id="thresholdRange" min="0.001" max="0.3" step="0.001" value="0.010">
-                    <span>低感度</span>
-                </div>
+                <button id="monitorMuteBtn" class="secondary btn-sm" style="margin-top: 8px;">モニタ音切替</button>
             </div>
 
             <div class="setting-group" style="grid-column: 1 / -1;">
-                <label>リアルタイム入力音量レベル（赤線：検知しきい値）</label>
+                <label>リアルタイム入力音量レベル</label>
                 <div class="meter-box">
                     <div id="meterFill" class="meter-fill"></div>
                     <div id="meterThreshold" class="meter-threshold" style="left: 0%;"></div>
@@ -283,8 +280,8 @@
         </div>
 
         <div class="controls">
-            <button id="initBtn">1. マイク接続を許可 (最初のみ)</button>
-            <button id="startBtn" disabled>2. 常時監視・自動録音開始</button>
+            <button id="initBtn">マイク接続許可</button>
+            <button id="startBtn" disabled>常時監視・自動録音開始</button>
             <button id="stopBtn" class="secondary" disabled>監視の一時停止</button>
         </div>
         
@@ -293,8 +290,8 @@
         </div>
 
         <div style="margin-top: 15px;">
-            <label>リアルタイム文字起こしプレビュー:</label>
-            <div id="liveTranscription" class="live-transcription-box">（音声待機中... 音が閾値を超えると自動で録音と文字起こしが始まります）</div>
+            <label>プレビュー:</label>
+            <div id="liveTranscription" class="live-transcription-box"></div>
         </div>
     </div>
 
@@ -302,7 +299,7 @@
     <div class="card" id="playerCard" style="display:none;">
         <h2>音声再生プレビュー</h2>
         <div class="player-panel">
-            <div id="playerInfoText" class="player-info">再生ファイル: 選択されていません</div>
+            <div id="playerInfoText" class="player-info">選択ファイルなし</div>
             <div class="player-controls">
                 <button id="playPauseBtn" class="btn-sm">一時停止</button>
                 <button id="stopPlayBtn" class="btn-sm secondary">停止</button>
@@ -315,12 +312,11 @@
     </div>
 
     <div class="card">
-        <h2>受信ログ一覧 (音声 ＆ 文字起こしセット)</h2>
-        <p style="font-size: 0.85rem; color: #64748b; margin-top: 0;">※ 3日経過したログは自動削除されます。ヘッダーをクリックすると各列でソートできます。</p>
+        <h2>受信ログ一覧</h2>
         
         <div class="batch-actions">
-            <button id="batchPlayBtn" class="btn-sm secondary" disabled>選択項目を続けてプレビュー</button>
-            <button id="batchDownloadBtn" class="btn-sm" disabled>選択項目を【1つのファイルに結合して】ダウンロード(ZIP)</button>
+            <button id="batchPlayBtn" class="btn-sm secondary" disabled>連続プレビュー</button>
+            <button id="batchDownloadBtn" class="btn-sm" disabled>ZIPダウンロード</button>
         </div>
 
         <div class="log-list-container">
@@ -330,14 +326,14 @@
                         <th class="col-select"><input type="checkbox" id="selectAllCheckbox" title="すべて選択"></th>
                         <th class="col-time" data-sort="time">検知日時 <span class="sort-icon">↕</span></th>
                         <th class="col-duration" data-sort="duration">録音時間 <span class="sort-icon">↕</span></th>
-                        <th class="col-text" data-sort="text">文字起こし内容 (クリックでその位置から再生) <span class="sort-icon">↕</span></th>
+                        <th class="col-text" data-sort="text">文字起こし内容 <span class="sort-icon">↕</span></th>
                         <th class="col-action">操作</th>
                     </tr>
                 </thead>
                 <tbody id="logTableBody">
                     <tr id="emptyRow">
                         <td colspan="5" style="text-align: center; color: #64748b; padding: 20px;">
-                            まだログがありません。「常時監視・自動録音開始」を押して音声を待ち受けてください。
+                            ログなし
                         </td>
                     </tr>
                 </tbody>
@@ -429,11 +425,10 @@
         if (monitorGainNode && audioContext) {
             monitorGainNode.gain.setValueAtTime(isMonitorMuted ? 0 : parseFloat(monitorVolumeRange.value), audioContext.currentTime);
         }
-        monitorMuteBtn.textContent = isMonitorMuted ? 'モニタ音：OFF (切替)' : 'モニタ音：ON (切替)';
+        monitorMuteBtn.textContent = isMonitorMuted ? 'モニタ音OFF' : 'モニタ音ON';
         monitorMuteBtn.classList.toggle('toggle-active', isMonitorMuted);
     });
 
-    // マイク許可＆パイプラインの初期化
     initBtn.addEventListener('click', async () => {
         try {
             mediaStream = await navigator.mediaDevices.getUserMedia({ 
@@ -469,7 +464,7 @@
             initBtn.disabled = true;
             startBtn.disabled = false;
         } catch (err) {
-            alert('マイクの許可が得られなかったか、デバイスが見つかりません。');
+            alert('マイク許可エラー');
         }
     });
 
@@ -522,7 +517,7 @@
                 isRecordingAudio = true;
                 activeRecordingChunks = [...preBuffer];
                 recordingStartTime = Date.now();
-                statusBadge.textContent = '音声検知・録音中...';
+                statusBadge.textContent = '録音中';
                 statusBadge.className = 'status recording';
             }
             if (silenceTimer) {
@@ -541,7 +536,6 @@
                         const nowEpoch = Date.now();
                         const durationSec = (nowEpoch - recordingStartTime) / 1000;
                         
-                        // 【追加機能】録音時間が5秒未満のものはノイズとして保存しない
                         if (durationSec >= 5.0) {
                             const timeStr = new Date(nowEpoch).toLocaleString();
                             const wavBlob = createWavBlob(activeRecordingChunks, sampleRate);
@@ -551,7 +545,7 @@
 
                         currentTranscriptBuffer = "";
                         interimTranscriptBuffer = "";
-                        liveTranscription.textContent = '（音声待機中... 音が閾値を超えると自動で録音と文字起こしが始まります）';
+                        liveTranscription.textContent = '';
 
                         activeRecordingChunks = [];
                         silenceTimer = null;
@@ -737,7 +731,7 @@
             }
         }
         audioPlayer.currentTime = Math.max(0, startSec);
-        audioPlayer.play().catch(e => alert('音声の再生に失敗しました。'));
+        audioPlayer.play().catch(e => alert('再生エラー'));
     }
 
     function cleanOldLogs() {
@@ -767,7 +761,6 @@
         updateBatchButtonStates();
     });
 
-    // 【追加機能】テーブルのソート機能
     function sortLogData(column) {
         if (currentSortColumn === column) {
             currentSortAscending = !currentSortAscending;
@@ -862,7 +855,7 @@
                     const span = document.createElement('span');
                     span.textContent = char;
                     span.className = 'clickable-text';
-                    span.title = 'クリックした位置から再生';
+                    span.title = 'クリック再生';
                     span.onclick = () => {
                         const ratio = charIdx / words.length;
                         let targetSec = (ratio * logItem.durationSec * 0.9) - 1.5;
@@ -874,7 +867,7 @@
                     tdText.appendChild(span);
                 });
             } else {
-                tdText.textContent = '（音声のみ検出・テキスト化なし）';
+                tdText.textContent = '（テキストなし）';
             }
             tr.appendChild(tdText);
 
@@ -883,6 +876,39 @@
 
             const actionDiv = document.createElement('div');
             actionDiv.className = 'action-btns';
+
+            const lineBtn = document.createElement('button');
+            lineBtn.className = 'btn-sm btn-line';
+            lineBtn.textContent = 'LINE共有';
+            lineBtn.onclick = async () => {
+                const shareText = `【無線受信ログ】\n検知日時: ${logItem.timestampStr}\n録音時間: ${formatDuration(logItem.durationSec)}\n内容: ${logItem.text || '（音声のみ）'}`;
+                const audioFile = new File([logItem.audioBlob], `wireless_${logItem.timestampEpoch}.wav`, { type: 'audio/wav' });
+
+                if (navigator.canShare && navigator.canShare({ files: [audioFile] })) {
+                    try {
+                        await navigator.share({
+                            title: '無線受信ログ',
+                            text: shareText,
+                            files: [audioFile]
+                        });
+                    } catch (err) {
+                        if (err.name !== 'AbortError') {
+                            alert('共有エラー');
+                        }
+                    }
+                } else if (navigator.share) {
+                    try {
+                        await navigator.share({
+                            title: '無線受信ログ',
+                            text: shareText
+                        });
+                    } catch (err) {}
+                } else {
+                    const lineUrl = `https://social-plugins.line.me/lineit/share?text=${encodeURIComponent(shareText)}`;
+                    window.open(lineUrl, '_blank');
+                }
+            };
+            actionDiv.appendChild(lineBtn);
 
             const playBtn = document.createElement('button');
             playBtn.className = 'btn-sm secondary';
@@ -923,7 +949,7 @@
 
         const queue = selectedItems.map(item => ({
             url: item.audioUrl,
-            title: `${item.timestampStr} (${formatDuration(logItem.durationSec)})` // 修正: item.durationSec
+            title: `${item.timestampStr} (${formatDuration(item.durationSec)})`
         }));
 
         if (queue.length > 0) {
@@ -938,7 +964,7 @@
         if (checkedBoxes.length === 0) return;
 
         batchDownloadBtn.disabled = true;
-        batchDownloadBtn.textContent = '結合ファイルを作成中...';
+        batchDownloadBtn.textContent = '作成中...';
 
         try {
             let selectedItems = Array.from(checkedBoxes).map(cb => logDatabase[parseInt(cb.dataset.index)]);
@@ -970,10 +996,10 @@
             URL.revokeObjectURL(downloadUrl);
 
         } catch (err) {
-            alert('ファイルの結合・生成に失敗しました: ' + err.message);
+            alert('ダウンロードエラー');
         } finally {
             batchDownloadBtn.disabled = false;
-            batchDownloadBtn.textContent = '選択項目を【1つのファイルに結合して】ダウンロード(ZIP)';
+            batchDownloadBtn.textContent = 'ZIPダウンロード';
         }
     };
 
@@ -1036,7 +1062,7 @@
     startBtn.addEventListener('click', async () => {
         try {
             if (!audioContext) {
-                alert("最初に「マイク接続を許可」ボタンを押してください。");
+                alert("マイク接続許可を押してください。");
                 return;
             }
             
@@ -1055,7 +1081,7 @@
             stopBtn.disabled = false;
 
         } catch (err) {
-            alert(`開始に失敗しました: ${err.message}`);
+            alert('開始エラー');
         }
     });
 
@@ -1072,7 +1098,6 @@
                 const nowEpoch = Date.now();
                 const durationSec = (nowEpoch - recordingStartTime) / 1000;
                 
-                // 停止時も5秒未満のものは破棄
                 if (durationSec >= 5.0) {
                     const timeStr = new Date(nowEpoch).toLocaleString();
                     const wavBlob = createWavBlob(activeRecordingChunks, sampleRate);
@@ -1094,7 +1119,7 @@
         statusBadge.className = 'status';
         startBtn.disabled = false;
         stopBtn.disabled = true;
-        liveTranscription.textContent = '（停止中）';
+        liveTranscription.textContent = '';
         meterFill.style.width = '0%';
     });
 
