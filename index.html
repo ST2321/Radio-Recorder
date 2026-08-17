@@ -236,6 +236,7 @@
         <h2>デバイス設定 & コントロール</h2>
         
         <div class="settings-grid">
+            <!-- 1列目: 入力デバイス選択の下に閾値設定 -->
             <div class="setting-group">
                 <label for="audioSource">入力デバイス</label>
                 <select id="audioSource">
@@ -244,20 +245,20 @@
             </div>
             
             <div class="setting-group">
-                <label for="audioOutput">出力先スピーカー</label>
-                <select id="audioOutput">
-                    <option value="">既定のスピーカー</option>
-                </select>
-            </div>
-
-            <!-- 音声検知感度とモニタ音量調節の配置を入れ替えました -->
-            <div class="setting-group">
                 <label for="thresholdRange">音声検知感度: <span id="thresholdValue">0.010</span></label>
                 <div class="range-container">
                     <span>高</span>
                     <input type="range" id="thresholdRange" min="0.001" max="0.3" step="0.001" value="0.010">
                     <span>低</span>
                 </div>
+            </div>
+
+            <!-- 2列目: 出力デバイス選択の下にモニタ音量および入切ボタン -->
+            <div class="setting-group">
+                <label for="audioOutput">出力先スピーカー</label>
+                <select id="audioOutput">
+                    <option value="">既定のスピーカー</option>
+                </select>
             </div>
 
             <div class="setting-group">
