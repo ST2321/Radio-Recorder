@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>無線受信記録ソフト</title>
+    <title>無線受信記録ソフト（IndexedDB永続保存版）</title>
     <!-- JSZipライブラリ（一括ZIPダウンロード用） -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
@@ -480,10 +480,10 @@
     let currentSortAscending = true;
     let db = null;
 
-    // IndexedDB初期化（大容量の音声ファイルをブラウザ内で安全・永続管理）
+    // IndexedDB初期化（大容量データの永続保存）
     function initIndexedDB() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open('WirelessLogDB_v2', 1);
+            const request = indexedDB.open('WirelessLogDB_v3', 1);
             request.onerror = () => reject(request.error);
             request.onsuccess = () => {
                 db = request.result;
@@ -896,7 +896,7 @@
         audioPlayer.play().catch(e => alert('再生エラー'));
     }
 
-    const STORAGE_META_KEY = 'wireless_log_metadata_v14';
+    const STORAGE_META_KEY = 'wireless_log_metadata_v15';
 
     async function loadLogsFromStorage() {
         try {
