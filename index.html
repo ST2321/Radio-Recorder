@@ -184,10 +184,14 @@
             position: relative;
             border: 1px solid var(--border-color);
         }
+        /* グラデーション位置は固定、幅（width）だけが可変で伸び縮みする仕様 */
         .meter-fill {
             background: linear-gradient(to right, #3b82f6, #22c55e, #eab308, #f97316, #ef4444);
             height: 100%;
             width: 0%;
+            position: absolute;
+            left: 0;
+            top: 0;
             transition: width 0.05s linear;
         }
         .meter-threshold {
@@ -195,6 +199,7 @@
             top: 0; bottom: 0;
             width: 2px;
             background: #ffffff;
+            z-index: 2;
         }
         .live-transcription-box {
             background: #000000;
@@ -500,7 +505,7 @@
     // IndexedDB初期化（大容量データの永続保存）
     function initIndexedDB() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open('WirelessLogDB_v4', 1);
+            const request = indexedDB.open('WirelessLogDB_v5', 1);
             request.onerror = () => reject(request.error);
             request.onsuccess = () => {
                 db = request.result;
@@ -942,7 +947,7 @@
         audioPlayer.play().catch(e => alert('再生エラー'));
     }
 
-    const STORAGE_META_KEY = 'wireless_log_metadata_v16';
+    const STORAGE_META_KEY = 'wireless_log_metadata_v17';
 
     async function loadLogsFromStorage() {
         try {
@@ -1246,23 +1251,19 @@
         
         try {
             batchDownloadBtn.disabled = true;
-            batchDownloadBtn.textContent = 'ZIPファイルを作成中...';
+            batchDownloadBtn.textContent = 'ZIP作成中...';
 
             const zip = new JSZip();
-            // ZIPファイル内に「wireless_records」という名前のフォルダを作成
             const folderName = `wireless_records_${getNumericTimestampFilename(Date.now())}`;
             const folder = zip.folder(folderName);
 
-            // 選択された音声をフォルダ内に追加
             selectedItems.forEach(item => {
                 const fileName = `${getNumericTimestampFilename(item.timestampEpoch)}.wav`;
                 folder.file(fileName, item.audioBlob);
             });
 
-            // ZIPアーカイブを生成
             const content = await zip.generateAsync({ type: 'blob' });
 
-            // ダウンロードリンクを生成して発火
             const downloadUrl = URL.createObjectURL(content);
             const a = document.createElement('a');
             a.href = downloadUrl;
@@ -1272,7 +1273,6 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(downloadUrl);
 
-            alert('音声ファイルをまとめたZIPフォルダのダウンロードが完了しました！');
         } catch (err) {
             console.error(err);
             alert('ZIPファイルの作成中にエラーが発生しました。');
@@ -1328,15 +1328,30 @@
             }
         };
 
+        // 途切れたり停止した場合に即座に再起動して認識漏れを防ぐ
         rec.onend = () => {
             if (isRunning) {
-                setTimeout(() => {
-                    if (isRunning) {
-                        try { rec.start(); } catch (e) {}
-                    }
-                }, 500);
+                try {
+                    rec.start();
+                } catch (e) {
+                    setTimeout(() => {
+                        if (isRunning) {
+                            try { rec.start(); } catch (err) {}
+                        }
+                    }, 100);
+                }
             }
         };
+
+        rec.onerror = (event) => {
+            // エラー時も自動で継続を試みる
+            if (isRunning && event.error !== 'not-allowed') {
+                try {
+                    rec.abort();
+                } catch (e) {}
+            }
+        };
+
         return rec;
     }
 
