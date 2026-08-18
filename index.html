@@ -834,7 +834,7 @@
         audioPlayer.play().catch(e => alert('再生エラー'));
     }
 
-    const STORAGE_KEY = 'wireless_log_database_v6';
+    const STORAGE_KEY = 'wireless_log_database_v7';
 
     function loadLogsFromStorage() {
         try {
@@ -844,17 +844,24 @@
             const now = Date.now();
             const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
-            const validItems = parsed.filter(item => (now - item.timestampEpoch) <= THREE_DAYS_MS);
+            const validItems = parsed.filter(item => item && item.timestampEpoch && (now - item.timestampEpoch) <= THREE_DAYS_MS);
             
             return validItems.map(item => {
-                const blob = base64ToBlob(item.audioBase64, 'audio/wav');
-                const audioUrl = URL.createObjectURL(blob);
-                return {
-                    ...item,
-                    audioBlob: blob,
-                    audioUrl: audioUrl
-                };
-            });
+                try {
+                    const blob = base64ToBlob(item.audioBase64, 'audio/wav');
+                    const audioUrl = URL.createObjectURL(blob);
+                    return {
+                        timestampEpoch: item.timestampEpoch,
+                        timestampStr: item.timestampStr,
+                        durationSec: item.durationSec,
+                        text: item.text,
+                        audioBlob: blob,
+                        audioUrl: audioUrl
+                    };
+                } catch (err) {
+                    return null;
+                }
+            }).filter(item => item !== null);
         } catch (e) {
             console.error('ストレージ読み込みエラー', e);
             return [];
@@ -863,8 +870,12 @@
 
     function saveLogsToStorage() {
         try {
-            const minimalItems = logDatabase.map(item => {
+            const minimalItemsPromises = logDatabase.map(item => {
                 return new Promise((resolve) => {
+                    if (!item.audioBlob) {
+                        resolve(null);
+                        return;
+                    }
                     const reader = new FileReader();
                     reader.onloadend = () => {
                         resolve({
@@ -875,12 +886,14 @@
                             audioBase64: reader.result
                         });
                     };
+                    reader.onerror = () => resolve(null);
                     reader.readAsDataURL(item.audioBlob);
                 });
             });
 
-            Promise.all(minimalItems).then(results => {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+            Promise.all(minimalItemsPromises).then(results => {
+                const validResults = results.filter(r => r !== null);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(validResults));
             });
         } catch (e) {
             console.error('ストレージ保存エラー', e);
@@ -888,8 +901,9 @@
     }
 
     function base64ToBlob(base64, mime) {
+        if (!base64 || typeof base64 !== 'string') throw new Error('Invalid base64');
         const parts = base64.split(',');
-        const byteString = atob(parts[1]);
+        const byteString = atob(parts.length > 1 ? parts[1] : parts[0]);
         const ab = new ArrayBuffer(byteString.length);
         const ia = new Uint8Array(ab);
         for (let i = 0; i < byteString.length; i++) {
