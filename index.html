@@ -379,15 +379,17 @@
     <div class="card">
         <div class="card-header-flex">
             <h2>受信</h2>
-            <span id="statusBadge" class="status">待機</span>
         </div>
         
-        <!-- 画面横幅を3等分（音量レベル、空白、音量バー）にした受信グリッド -->
+        <!-- 画面横幅を3等分（音量レベル、空白、音量バー）にし、ステータスを音量レベルの左側に配置 -->
         <div class="receive-grid">
-            <!-- 1列目：入力音量レベル -->
+            <!-- 1列目：ステータス ＆ 入力音量レベル -->
             <div class="setting-group">
-                <label>入力音量レベル</label>
-                <div class="meter-box" style="margin-top: 3px; width: 100%;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px;">
+                    <label style="margin-bottom: 0;">入力音量レベル</label>
+                    <span id="statusBadge" class="status">待機</span>
+                </div>
+                <div class="meter-box" style="width: 100%;">
                     <div id="meterFill" class="meter-fill"></div>
                     <div id="meterThreshold" class="meter-threshold" style="left: 0%;"></div>
                 </div>
@@ -832,7 +834,7 @@
         audioPlayer.play().catch(e => alert('再生エラー'));
     }
 
-    const STORAGE_KEY = 'wireless_log_database_v5';
+    const STORAGE_KEY = 'wireless_log_database_v6';
 
     function loadLogsFromStorage() {
         try {
@@ -886,7 +888,8 @@
     }
 
     function base64ToBlob(base64, mime) {
-        const byteString = atob(base64.split(',')[1]);
+        const parts = base64.split(',');
+        const byteString = atob(parts[1]);
         const ab = new ArrayBuffer(byteString.length);
         const ia = new Uint8Array(ab);
         for (let i = 0; i < byteString.length; i++) {
@@ -1281,12 +1284,12 @@
                 const nowEpoch = Date.now();
                 const durationSec = (nowEpoch - recordingStartTime) / 1000;
                 
-                (durationSec >= 5.0) && (() => {
+                if (durationSec >= 5.0) {
                     const timeStr = new Date(nowEpoch).toLocaleString();
                     const wavBlob = createWavBlob(activeRecordingChunks, sampleRate);
                     const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
                     saveLogToStorage(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
-                })();
+                }
             }
         }
 
@@ -1306,6 +1309,7 @@
         meterFill.style.width = '0%';
     });
 
+    // 起動時に保存されたログを読み込んでテーブルに反映
     logDatabase = loadLogsFromStorage();
     cleanOldLogs();
 </script>
