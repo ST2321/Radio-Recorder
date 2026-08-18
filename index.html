@@ -670,23 +670,19 @@
                         statusBadge.textContent = '待機';
                         statusBadge.className = 'status active';
 
-                        // 後ろ3秒分に相当するサンプル数を計算してカットする
-                        // スクリプトプロセッサーのバッファサイズ2048、サンプルレートから1秒あたりのサンプル数を算出し、3秒分を削除
+                        // 無音検知が確定した時点で、後ろの5秒間の無音分に相当するチャンクをカットして保存する
                         const samplesPerSecond = sampleRate / 2048; 
-                        const cutChunksCount = Math.round(samplesPerSecond * 3);
+                        const silenceCutCount = Math.round(samplesPerSecond * 5);
                         
                         let finalChunks = activeRecordingChunks;
-                        if (activeRecordingChunks.length > cutChunksCount) {
-                            finalChunks = activeRecordingChunks.slice(0, activeRecordingChunks.length - cutChunksCount);
-                        } else {
-                            // 録音データ自体が非常に短い場合はそのまま
-                            finalChunks = activeRecordingChunks;
+                        if (activeRecordingChunks.length > silenceCutCount) {
+                            finalChunks = activeRecordingChunks.slice(0, activeRecordingChunks.length - silenceCutCount);
                         }
 
                         const nowEpoch = Date.now();
-                        const durationSec = (nowEpoch - recordingStartTime) / 1000 - 3; // 表示上の尺も3秒引く
+                        const durationSec = (nowEpoch - recordingStartTime) / 1000 - 5; // 表示上の尺も5秒引く
                         
-                        if (durationSec >= 2.0 && finalChunks.length > 0) {
+                        if (durationSec >= 0.5 && finalChunks.length > 0) {
                             const timeStr = new Date(nowEpoch).toLocaleString();
                             const wavBlob = createWavBlob(finalChunks, sampleRate);
                             const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
@@ -848,7 +844,7 @@
         audioPlayer.play().catch(e => alert('再生エラー'));
     }
 
-    const STORAGE_KEY = 'wireless_log_database_v8';
+    const STORAGE_KEY = 'wireless_log_database_v9';
 
     function loadLogsFromStorage() {
         try {
@@ -1160,7 +1156,7 @@
 
         const queue = selectedItems.map(item => ({
             url: item.audioUrl,
-            title: `${item.timestampStr} (${formatDuration(logItem.durationSec)})`
+            title: `${item.timestampStr} (${formatDuration(item.durationSec)})`
         }));
 
         if (queue.length > 0) {
@@ -1312,7 +1308,7 @@
                 const nowEpoch = Date.now();
                 const durationSec = (nowEpoch - recordingStartTime) / 1000;
                 
-                if (durationSec >= 2.0) {
+                if (durationSec >= 0.5) {
                     const timeStr = new Date(nowEpoch).toLocaleString();
                     const wavBlob = createWavBlob(activeRecordingChunks, sampleRate);
                     const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
