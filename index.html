@@ -361,7 +361,7 @@
             </div>
 
             <div class="setting-group">
-                <label>データ管理</label>
+                <label>データ管理（自動消去: 3日経過）</label>
                 <button id="clearAllDataBtn" class="btn-danger btn-sm" style="margin-top: 3px;">保存データをすべて削除</button>
             </div>
         </div>
@@ -478,6 +478,69 @@
     let logDatabase = [];
     let currentSortColumn = null;
     let currentSortAscending = true;
+    let db = null;
+
+    // IndexedDB初期化（大容量の音声ファイルをブラウザ内で安全・永続管理）
+    function initIndexedDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('WirelessLogDB_v2', 1);
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                db = request.result;
+                resolve(db);
+            };
+            request.onupgradeneeded = (event) => {
+                const database = event.target.result;
+                if (!database.objectStoreNames.contains('audios')) {
+                    database.createObjectStore('audios', { keyPath: 'id' });
+                }
+            };
+        });
+    }
+
+    function saveAudioToIDB(id, blob) {
+        return new Promise((resolve, reject) => {
+            if (!db) return resolve();
+            const transaction = db.transaction(['audios'], 'readwrite');
+            const store = transaction.objectStore('audios');
+            store.put({ id: id, blob: blob });
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+        });
+    }
+
+    function getAudioFromIDB(id) {
+        return new Promise((resolve, reject) => {
+            if (!db) return resolve(null);
+            const transaction = db.transaction(['audios'], 'readonly');
+            const store = transaction.objectStore('audios');
+            const request = store.get(id);
+            request.onsuccess = () => resolve(request.result ? request.result.blob : null);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    function deleteAudioFromIDB(id) {
+        return new Promise((resolve) => {
+            if (!db) return resolve();
+            const transaction = db.transaction(['audios'], 'readwrite');
+            const store = transaction.objectStore('audios');
+            store.delete(id);
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => resolve();
+        });
+    }
+
+    function clearAllAudioIDB() {
+        return new Promise((resolve) => {
+            if (!db) return resolve();
+            const transaction = db.transaction(['audios'], 'readwrite');
+            const store = transaction.objectStore('audios');
+            store.clear();
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => resolve();
+        });
+    }
 
     const toggleSettingsBtn = document.getElementById('toggleSettingsBtn');
     const settingsCard = document.getElementById('settingsCard');
@@ -653,7 +716,7 @@
             }
         } else {
             if (isRecordingAudio && !silenceTimer) {
-                silenceTimer = setTimeout(() => {
+                silenceTimer = setTimeout(async () => {
                     if (isRecordingAudio) {
                         isRecordingAudio = false;
 
@@ -675,7 +738,7 @@
                             const timeStr = new Date(nowEpoch).toLocaleString();
                             const wavBlob = createWavBlob(finalChunks, sampleRate);
                             const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
-                            saveLogToStorage(nowEpoch, timeStr, Math.max(0.1, durationSec), finalRecordedText, wavBlob);
+                            await saveLogToStorage(nowEpoch, timeStr, Math.max(0.1, durationSec), finalRecordedText, wavBlob);
                         }
 
                         currentTranscriptBuffer = "";
@@ -833,11 +896,11 @@
         audioPlayer.play().catch(e => alert('再生エラー'));
     }
 
-    const STORAGE_KEY = 'wireless_log_database_v12';
+    const STORAGE_META_KEY = 'wireless_log_metadata_v14';
 
-    function loadLogsFromStorage() {
+    async function loadLogsFromStorage() {
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
+            const raw = localStorage.getItem(STORAGE_META_KEY);
             if (!raw) return [];
             const parsed = JSON.parse(raw);
             const now = Date.now();
@@ -845,106 +908,79 @@
 
             const validItems = parsed.filter(item => item && item.timestampEpoch && (now - item.timestampEpoch) <= THREE_DAYS_MS);
             
-            return validItems.map(item => {
+            const loadedLogs = [];
+            for (const item of validItems) {
                 try {
-                    const blob = base64ToBlob(item.audioBase64, 'audio/wav');
-                    const audioUrl = URL.createObjectURL(blob);
-                    return {
-                        timestampEpoch: item.timestampEpoch,
-                        timestampStr: item.timestampStr,
-                        durationSec: item.durationSec,
-                        text: item.text,
-                        audioBlob: blob,
-                        audioUrl: audioUrl
-                    };
+                    const blob = await getAudioFromIDB(item.timestampEpoch);
+                    if (blob) {
+                        const audioUrl = URL.createObjectURL(blob);
+                        loadedLogs.push({
+                            timestampEpoch: item.timestampEpoch,
+                            timestampStr: item.timestampStr,
+                            durationSec: item.durationSec,
+                            text: item.text,
+                            audioBlob: blob,
+                            audioUrl: audioUrl
+                        });
+                    }
                 } catch (err) {
-                    return null;
+                    // skip
                 }
-            }).filter(item => item !== null);
+            }
+            return loadedLogs;
         } catch (e) {
             console.error('ストレージ読み込みエラー', e);
             return [];
         }
     }
 
-    function saveLogsToStorage() {
+    function saveMetadataToStorage() {
         try {
-            // 容量圧迫を防ぐため、最新の最大20件程度に絞って保存する
-            const targetItems = logDatabase.slice(0, 20);
-            const minimalItemsPromises = targetItems.map(item => {
-                return new Promise((resolve) => {
-                    if (!item.audioBlob) {
-                        resolve(null);
-                        return;
-                    }
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        resolve({
-                            timestampEpoch: item.timestampEpoch,
-                            timestampStr: item.timestampStr,
-                            durationSec: item.durationSec,
-                            text: item.text,
-                            audioBase64: reader.result
-                        });
-                    };
-                    reader.onerror = () => resolve(null);
-                    reader.readAsDataURL(item.audioBlob);
-                });
-            });
-
-            Promise.all(minimalItemsPromises).then(results => {
-                const validResults = results.filter(r => r !== null);
-                try {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(validResults));
-                } catch (storageErr) {
-                    // 容量オーバー時のフォールバック（さらに古いものを削るか警告）
-                    console.warn('LocalStorage容量超過の可能性:', storageErr);
-                }
-            });
+            const minimalItems = logDatabase.map(item => ({
+                timestampEpoch: item.timestampEpoch,
+                timestampStr: item.timestampStr,
+                durationSec: item.durationSec,
+                text: item.text
+            }));
+            localStorage.setItem(STORAGE_META_KEY, JSON.stringify(minimalItems));
         } catch (e) {
-            console.error('ストレージ保存エラー', e);
+            console.error('メタデータ保存エラー', e);
         }
     }
 
-    function base64ToBlob(base64, mime) {
-        if (!base64 || typeof base64 !== 'string') throw new Error('Invalid base64');
-        const parts = base64.split(',');
-        const byteString = atob(parts.length > 1 ? parts[1] : parts[0]);
-        const ab = new ArrayBuffer(byteString.length);
-        const ia = new Uint8Array(ab);
-        for (let i = 0; i < byteString.length; i++) {
-            ia[i] = byteString.charCodeAt(i);
-        }
-        return new Blob([ab], { type: mime });
-    }
-
-    function cleanOldLogs() {
+    async function cleanOldLogs() {
         const now = Date.now();
         const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
         
         let changed = false;
-        logDatabase = logDatabase.filter(item => {
+        const keptLogs = [];
+        
+        for (const item of logDatabase) {
             const isAlive = (now - item.timestampEpoch) <= THREE_DAYS_MS;
-            if (!isAlive) {
+            if (isAlive) {
+                keptLogs.push(item);
+            } else {
                 changed = true;
                 if (item.audioUrl) URL.revokeObjectURL(item.audioUrl);
+                await deleteAudioFromIDB(item.timestampEpoch);
             }
-            return isAlive;
-        });
+        }
 
+        logDatabase = keptLogs;
         if (changed) {
-            saveLogsToStorage();
+            saveMetadataToStorage();
         }
         renderLogTable();
     }
 
-    clearAllDataBtn.addEventListener('click', () => {
+    clearAllDataBtn.addEventListener('click', async () => {
         if (confirm('保存されているすべてのログと音声データを削除しますか？')) {
             logDatabase.forEach(item => {
                 if (item.audioUrl) URL.revokeObjectURL(item.audioUrl);
             });
             logDatabase = [];
-            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(STORAGE_META_KEY);
+            await clearAllAudioIDB();
             renderLogTable();
             alert('すべてのデータを削除しました。');
         }
@@ -1124,13 +1160,14 @@
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'btn-sm btn-danger';
             deleteBtn.textContent = '削除';
-            deleteBtn.onclick = () => {
+            deleteBtn.onclick = async () => {
                 URL.revokeObjectURL(logItem.audioUrl);
                 const realIndex = logDatabase.indexOf(logItem);
                 if (realIndex > -1) {
                     logDatabase.splice(realIndex, 1);
                 }
-                saveLogsToStorage();
+                await deleteAudioFromIDB(logItem.timestampEpoch);
+                saveMetadataToStorage();
                 renderLogTable();
             };
             actionDiv.appendChild(deleteBtn);
@@ -1208,7 +1245,7 @@
         }
     };
 
-    function saveLogToStorage(timestampEpoch, timestampStr, durationSec, text, audioBlob) {
+    async function saveLogToStorage(timestampEpoch, timestampStr, durationSec, text, audioBlob) {
         const audioUrl = URL.createObjectURL(audioBlob);
         logDatabase.unshift({
             timestampEpoch,
@@ -1218,8 +1255,9 @@
             audioBlob,
             audioUrl
         });
-        cleanOldLogs();
-        saveLogsToStorage();
+        await saveAudioToIDB(timestampEpoch, audioBlob);
+        await cleanOldLogs();
+        saveMetadataToStorage();
     }
 
     function initSpeechRecognition() {
@@ -1308,7 +1346,7 @@
                     const timeStr = new Date(nowEpoch).toLocaleString();
                     const wavBlob = createWavBlob(activeRecordingChunks, sampleRate);
                     const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
-                    saveLogToStorage(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
+                    await saveLogToStorage(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
                 }
             }
         }
@@ -1329,9 +1367,13 @@
         meterFill.style.width = '0%';
     });
 
-    // 起動時の初期化と読み込み
-    logDatabase = loadLogsFromStorage();
-    cleanOldLogs();
+    // 起動時の初期化と自動クリーンアップ（3日経過データの削除）
+    initIndexedDB().then(async () => {
+        logDatabase = await loadLogsFromStorage();
+        await cleanOldLogs();
+    }).catch(err => {
+        console.error('IndexedDB初期化失敗', err);
+    });
 </script>
 
 </body>
