@@ -8,13 +8,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
-            --primary-color: #2563eb;
-            --bg-color: #f1f5f9;
-            --card-bg: #ffffff;
-            --text-color: #1e293b;
-            --border-color: #cbd5e1;
-            --danger-color: #ef4444;
-            --success-color: #166534;
+            --primary-color: #ffffff;
+            --bg-color: #000000;
+            --card-bg: #000000;
+            --text-color: #ffffff;
+            --border-color: #333333;
+            --danger-color: #ff4d4d;
+            --success-color: #ffffff;
             --line-color: #06c755;
         }
         body {
@@ -30,18 +30,30 @@
             margin: 0 auto;
         }
         header {
-            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 25px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
         }
         h1 {
-            color: var(--primary-color);
-            margin-bottom: 5px;
+            color: #ffffff;
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        h2 {
+            color: #ffffff;
+            font-size: 1.1rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-top: 0;
         }
         .card {
             background: var(--card-bg);
             border-radius: 8px;
             padding: 20px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 0 0 1px var(--border-color);
             margin-bottom: 20px;
         }
         .settings-grid {
@@ -58,6 +70,7 @@
             font-size: 0.875rem;
             font-weight: bold;
             margin-bottom: 5px;
+            color: #ffffff;
         }
         select, input[type="range"], button {
             padding: 10px;
@@ -65,13 +78,14 @@
             border-radius: 6px;
             border: 1px solid var(--border-color);
         }
-        select { background-color: #fff; }
+        select { background-color: #000000; color: #ffffff; }
         .range-container {
             display: flex;
             align-items: center;
             gap: 10px;
+            color: #ffffff;
         }
-        .range-container input { flex: 1; }
+        .range-container input { flex: 1; background: #000000; }
         .controls {
             display: flex;
             gap: 10px;
@@ -79,39 +93,49 @@
             margin-top: 15px;
         }
         button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
+            background-color: #ffffff;
+            color: #000000;
+            border: 1px solid #ffffff;
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: opacity 0.2s, background-color 0.2s, color 0.2s;
+            font-weight: bold;
         }
-        button:hover { opacity: 0.9; }
-        button.secondary { background-color: #64748b; }
-        button.toggle-active { background-color: var(--danger-color); }
-        button.btn-line { background-color: var(--line-color); }
-        button:disabled { background-color: #94a3b8; cursor: not-allowed; }
+        button:hover { background-color: #000000; color: #ffffff; }
+        button.secondary { background-color: #000000; color: #ffffff; border: 1px solid #ffffff; }
+        button.secondary:hover { background-color: #ffffff; color: #000000; }
+        button.toggle-active { background-color: #ffffff; color: #000000; border: 1px solid #ff4d4d; }
+        button.btn-line { background-color: #000000; color: #06c755; border: 1px solid #06c755; }
+        button.btn-line:hover { background-color: #06c755; color: #000000; }
+        button:disabled { background-color: #000000; color: #444444; border-color: #222222; cursor: not-allowed; }
+        
         .status {
             font-weight: bold;
             display: inline-block;
             padding: 4px 10px;
             border-radius: 4px;
-            background-color: #e2e8f0;
+            background-color: #111111;
+            color: #ffffff;
+            border: 1px solid var(--border-color);
             font-size: 0.875rem;
+            text-align: center;
+            min-width: 60px;
         }
-        .status.active { background-color: #dcfce7; color: var(--success-color); }
-        .status.recording { background-color: #fee2e2; color: var(--danger-color); animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .status.active { background-color: #000000; color: #ffffff; border-color: #ffffff; }
+        .status.recording { background-color: #000000; color: #ff4d4d; border-color: #ff4d4d; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+        
         .meter-box {
-            background: #e2e8f0;
+            background: #111111;
             border-radius: 4px;
             height: 16px;
             width: 100%;
             overflow: hidden;
             margin-top: 5px;
             position: relative;
+            border: 1px solid var(--border-color);
         }
         .meter-fill {
-            background: var(--primary-color);
+            background: linear-gradient(to right, #3b82f6, #22c55e, #eab308, #f97316, #ef4444);
             height: 100%;
             width: 0%;
             transition: width 0.05s linear;
@@ -120,11 +144,11 @@
             position: absolute;
             top: 0; bottom: 0;
             width: 2px;
-            background: var(--danger-color);
+            background: #ffffff;
         }
         .live-transcription-box {
-            background: #0f172a;
-            color: #38bdf8;
+            background: #000000;
+            color: #ffffff;
             padding: 15px;
             border-radius: 6px;
             font-family: monospace;
@@ -134,13 +158,14 @@
             overflow-y: auto;
             margin-top: 10px;
             word-break: break-all;
+            border: 1px solid var(--border-color);
         }
         .log-list-container {
             max-height: 450px;
             overflow-y: auto;
             border: 1px solid var(--border-color);
             border-radius: 6px;
-            background: #fff;
+            background: #000000;
         }
         
         table {
@@ -156,15 +181,17 @@
             overflow-wrap: break-word;
         }
         th {
-            background-color: #f8fafc;
+            background-color: #000000;
+            color: #ffffff;
             position: sticky;
             top: 0;
             z-index: 10;
             cursor: pointer;
             user-select: none;
+            border-bottom: 2px solid #ffffff;
         }
-        th:hover { background-color: #e2e8f0; }
-        th .sort-icon { font-size: 0.8rem; color: #64748b; margin-left: 4px; }
+        th:hover { background-color: #111111; }
+        th .sort-icon { font-size: 0.8rem; color: #ffffff; margin-left: 4px; }
         
         .col-select { width: 45px; text-align: center; }
         .col-time { width: 150px; white-space: nowrap; }
@@ -174,12 +201,12 @@
 
         .clickable-text {
             cursor: pointer;
-            color: #1d4ed8;
+            color: #ffffff;
             text-decoration: underline dotted;
         }
         .clickable-text:hover {
-            color: #2563eb;
-            background-color: #eff6ff;
+            background-color: #ffffff;
+            color: #000000;
         }
 
         .batch-actions {
@@ -197,13 +224,14 @@
             flex-wrap: nowrap;
         }
         .btn-sm { padding: 6px 10px; font-size: 0.8rem; border-radius: 4px; }
-        .btn-danger { background-color: var(--danger-color); }
+        .btn-danger { background-color: #000000; color: #ff4d4d; border: 1px solid #ff4d4d; }
+        .btn-danger:hover { background-color: #ff4d4d; color: #000000; }
         
         .player-panel {
             display: flex;
             flex-direction: column;
             gap: 12px;
-            background: #f8fafc;
+            background: #000000;
             padding: 15px;
             border-radius: 6px;
             border: 1px solid var(--border-color);
@@ -211,17 +239,25 @@
         .player-info {
             font-size: 0.9rem;
             font-weight: bold;
-            color: #475569;
+            color: #ffffff;
         }
         .player-controls {
             display: flex;
             align-items: center;
             gap: 10px;
             flex-wrap: wrap;
+            color: #ffffff;
         }
         .player-controls input[type="range"] {
             flex: 1;
             cursor: pointer;
+            background: #000000;
+        }
+        .collapsible-content {
+            display: none;
+        }
+        .collapsible-content.open {
+            display: block;
         }
     </style>
 </head>
@@ -230,13 +266,13 @@
 <div class="container">
     <header>
         <h1>無線受信記録ソフト</h1>
+        <button id="toggleSettingsBtn" class="secondary btn-sm">⚙️ 設定を表示</button>
     </header>
 
-    <div class="card">
-        <h2>デバイス設定 & コントロール</h2>
-        
+    <!-- 設定パネル（折りたたみ式） -->
+    <div class="card collapsible-content" id="settingsCard">
+        <h2>デバイス設定 & 制御</h2>
         <div class="settings-grid">
-            <!-- 上段左: 入力デバイス -->
             <div class="setting-group">
                 <label for="audioSource">入力デバイス</label>
                 <select id="audioSource">
@@ -244,7 +280,6 @@
                 </select>
             </div>
             
-            <!-- 上段右: 出力デバイス -->
             <div class="setting-group">
                 <label for="audioOutput">出力先スピーカー</label>
                 <select id="audioOutput">
@@ -252,10 +287,8 @@
                 </select>
             </div>
 
-            <!-- 出力と閾値の間を空けるための区切り線、またはグリッドの区切り調整 -->
-            <div style="grid-column: 1 / -1; margin: 10px 0; border-top: 1px dashed var(--border-color);"></div>
+            <div style="grid-column: 1 / -1; margin: 5px 0; border-top: 1px dashed var(--border-color);"></div>
 
-            <!-- 下段左: 閾値設定 -->
             <div class="setting-group">
                 <label for="thresholdRange">音声検知感度 (閾値): <span id="thresholdValue">0.010</span></label>
                 <div class="range-container">
@@ -265,7 +298,23 @@
                 </div>
             </div>
 
-            <!-- 下段右: モニタ音量および入切ボタン -->
+            <div class="setting-group">
+                <label>データ管理</label>
+                <button id="clearAllDataBtn" class="btn-danger btn-sm" style="margin-top: 5px;">保存データをすべて削除</button>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="initBtn">マイク接続許可</button>
+            <button id="startBtn" disabled>自動録音開始</button>
+            <button id="stopBtn" class="secondary" disabled>一時停止</button>
+        </div>
+    </div>
+
+    <!-- 通常画面エリア：音量バー・ステータス・モニタ音設定・文字起こしプレビュー -->
+    <div class="card">
+        <h2>リアルタイムモニター</h2>
+        <div class="settings-grid" style="margin-bottom: 0;">
             <div class="setting-group">
                 <label for="monitorVolumeRange">モニタ音量調節: <span id="monitorVolumeValue">100%</span></label>
                 <div class="range-container">
@@ -276,27 +325,20 @@
                 <button id="monitorMuteBtn" class="secondary btn-sm" style="margin-top: 8px;">モニタ音切替</button>
             </div>
 
-            <div class="setting-group" style="grid-column: 1 / -1;">
-                <label>リアルタイム入力音量レベル</label>
-                <div class="meter-box">
-                    <div id="meterFill" class="meter-fill"></div>
-                    <div id="meterThreshold" class="meter-threshold" style="left: 0%;"></div>
+            <div class="setting-group">
+                <label>入力音量レベル</label>
+                <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+                    <span id="statusBadge" class="status">待機</span>
+                    <div class="meter-box" style="margin-top: 0; flex: 1;">
+                        <div id="meterFill" class="meter-fill"></div>
+                        <div id="meterThreshold" class="meter-threshold" style="left: 0%;"></div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="controls">
-            <button id="initBtn">マイク接続許可</button>
-            <button id="startBtn" disabled>常時監視・自動録音開始</button>
-            <button id="stopBtn" class="secondary" disabled>監視の一時停止</button>
-        </div>
-        
         <div style="margin-top: 15px;">
-            <p style="margin: 0;">ステータス: <span id="statusBadge" class="status">待機中</span></p>
-        </div>
-
-        <div style="margin-top: 15px;">
-            <label>プレビュー:</label>
+            <label>文字起こしプレビュー:</label>
             <div id="liveTranscription" class="live-transcription-box"></div>
         </div>
     </div>
@@ -317,12 +359,13 @@
         <audio id="audioPlayer" style="display:none;"></audio>
     </div>
 
+    <!-- 受信ログ一覧 -->
     <div class="card">
         <h2>受信ログ一覧</h2>
         
         <div class="batch-actions">
             <button id="batchPlayBtn" class="btn-sm secondary" disabled>連続プレビュー</button>
-            <button id="batchDownloadBtn" class="btn-sm" disabled>ZIPダウンロード</button>
+            <button id="batchDownloadBtn" class="btn-sm secondary" disabled>ZIPダウンロード</button>
         </div>
 
         <div class="log-list-container">
@@ -338,7 +381,7 @@
                 </thead>
                 <tbody id="logTableBody">
                     <tr id="emptyRow">
-                        <td colspan="5" style="text-align: center; color: #64748b; padding: 20px;">
+                        <td colspan="5" style="text-align: center; color: #888888; padding: 20px;">
                             ログなし
                         </td>
                     </tr>
@@ -372,6 +415,8 @@
     let currentSortColumn = null;
     let currentSortAscending = true;
 
+    const toggleSettingsBtn = document.getElementById('toggleSettingsBtn');
+    const settingsCard = document.getElementById('settingsCard');
     const initBtn = document.getElementById('initBtn');
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
@@ -384,6 +429,7 @@
     const selectAllCheckbox = document.getElementById('selectAllCheckbox');
     const batchPlayBtn = document.getElementById('batchPlayBtn');
     const batchDownloadBtn = document.getElementById('batchDownloadBtn');
+    const clearAllDataBtn = document.getElementById('clearAllDataBtn');
     
     const audioPlayer = document.getElementById('audioPlayer');
     const playerCard = document.getElementById('playerCard');
@@ -405,6 +451,12 @@
 
     let soundThreshold = parseFloat(thresholdRange.value);
     const METER_SCALE_MAX = 0.3; 
+
+    // 設定パネルの表示切替
+    toggleSettingsBtn.addEventListener('click', () => {
+        const isOpen = settingsCard.classList.toggle('open');
+        toggleSettingsBtn.textContent = isOpen ? '⚙️ 設定を隠す' : '⚙️ 設定を表示';
+    });
 
     function updateThresholdIndicator() {
         const meterPercent = (soundThreshold / METER_SCALE_MAX) * 100;
@@ -466,7 +518,7 @@
                 recognition = initSpeechRecognition();
             }
 
-            statusBadge.textContent = '準備完了';
+            statusBadge.textContent = '待機';
             initBtn.disabled = true;
             startBtn.disabled = false;
         } catch (err) {
@@ -523,7 +575,7 @@
                 isRecordingAudio = true;
                 activeRecordingChunks = [...preBuffer];
                 recordingStartTime = Date.now();
-                statusBadge.textContent = '録音中';
+                statusBadge.textContent = '録音';
                 statusBadge.className = 'status recording';
             }
             if (silenceTimer) {
@@ -536,7 +588,7 @@
                     if (isRecordingAudio) {
                         isRecordingAudio = false;
 
-                        statusBadge.textContent = '常時監視中';
+                        statusBadge.textContent = '待機';
                         statusBadge.className = 'status active';
 
                         const nowEpoch = Date.now();
@@ -546,7 +598,7 @@
                             const timeStr = new Date(nowEpoch).toLocaleString();
                             const wavBlob = createWavBlob(activeRecordingChunks, sampleRate);
                             const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
-                            addLogEntry(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
+                            saveLogToStorage(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
                         }
 
                         currentTranscriptBuffer = "";
@@ -612,43 +664,6 @@
         for (let i = 0; i < string.length; i++) {
             view.setUint8(offset + i, string.charCodeAt(i));
         }
-    }
-
-    async function combineWavBlobs(blobs) {
-        if (blobs.length === 0) return null;
-        let totalAudioLen = 0;
-        const buffers = [];
-        
-        for (let i = 0; i < blobs.length; i++) {
-            const arrayBuffer = await blobs[i].arrayBuffer();
-            const audioData = new Uint8Array(arrayBuffer, 44);
-            buffers.push(audioData);
-            totalAudioLen += audioData.length;
-        }
-
-        const outBuffer = new Uint8Array(44 + totalAudioLen);
-        const view = new DataView(outBuffer.buffer);
-
-        writeString(view, 0, 'RIFF');
-        view.setUint32(4, 36 + totalAudioLen, true);
-        writeString(view, 8, 'WAVE');
-        writeString(view, 12, 'fmt ');
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true);
-        view.setUint16(22, 1, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * 2, true);
-        view.setUint16(32, 2, true);
-        view.setUint16(34, 16, true);
-        writeString(view, 36, 'data');
-        view.setUint32(40, totalAudioLen, true);
-
-        let offset = 44;
-        for (let buf of buffers) {
-            outBuffer.set(buf, offset);
-            offset += buf.length;
-        }
-        return new Blob([outBuffer], { type: 'audio/wav' });
     }
 
     function formatDuration(seconds) {
@@ -740,19 +755,101 @@
         audioPlayer.play().catch(e => alert('再生エラー'));
     }
 
+    // --- データの永続化と3日間の期限管理 ---
+    const STORAGE_KEY = 'wireless_log_database_v2';
+
+    function loadLogsFromStorage() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            const now = Date.now();
+            const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
+            const validItems = parsed.filter(item => (now - item.timestampEpoch) <= THREE_DAYS_MS);
+            
+            return validItems.map(item => {
+                const blob = base64ToBlob(item.audioBase64, 'audio/wav');
+                const audioUrl = URL.createObjectURL(blob);
+                return {
+                    ...item,
+                    audioBlob: blob,
+                    audioUrl: audioUrl
+                };
+            });
+        } catch (e) {
+            console.error('ストレージ読み込みエラー', e);
+            return [];
+        }
+    }
+
+    function saveLogsToStorage() {
+        try {
+            const minimalItems = logDatabase.map(item => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        resolve({
+                            timestampEpoch: item.timestampEpoch,
+                            timestampStr: item.timestampStr,
+                            durationSec: item.durationSec,
+                            text: item.text,
+                            audioBase64: reader.result
+                        });
+                    };
+                    reader.readAsDataURL(item.audioBlob);
+                });
+            });
+
+            Promise.all(minimalItems).then(results => {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+            });
+        } catch (e) {
+            console.error('ストレージ保存エラー', e);
+        }
+    }
+
+    function base64ToBlob(base64, mime) {
+        const byteString = atob(base64.split(',')[1]);
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+        }
+        return new Blob([ab], { type: mime });
+    }
+
     function cleanOldLogs() {
         const now = Date.now();
         const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
         
+        let changed = false;
         logDatabase = logDatabase.filter(item => {
             const isAlive = (now - item.timestampEpoch) <= THREE_DAYS_MS;
-            if (!isAlive && item.audioUrl) {
-                URL.revokeObjectURL(item.audioUrl);
+            if (!isAlive) {
+                changed = true;
+                if (item.audioUrl) URL.revokeObjectURL(item.audioUrl);
             }
             return isAlive;
         });
+
+        if (changed) {
+            saveLogsToStorage();
+        }
         renderLogTable();
     }
+
+    clearAllDataBtn.addEventListener('click', () => {
+        if (confirm('保存されているすべてのログと音声データを削除しますか？')) {
+            logDatabase.forEach(item => {
+                if (item.audioUrl) URL.revokeObjectURL(item.audioUrl);
+            });
+            logDatabase = [];
+            localStorage.removeItem(STORAGE_KEY);
+            renderLogTable();
+            alert('すべてのデータを削除しました。');
+        }
+    });
 
     function updateBatchButtonStates() {
         const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
@@ -885,7 +982,7 @@
 
             const lineBtn = document.createElement('button');
             lineBtn.className = 'btn-sm btn-line';
-            lineBtn.textContent = 'LINE共有';
+            lineBtn.textContent = '共有';
             lineBtn.onclick = async () => {
                 const shareText = `【無線受信ログ】\n検知日時: ${logItem.timestampStr}\n録音時間: ${formatDuration(logItem.durationSec)}\n内容: ${logItem.text || '（音声のみ）'}`;
                 const audioFile = new File([logItem.audioBlob], `wireless_${logItem.timestampEpoch}.wav`, { type: 'audio/wav' });
@@ -934,6 +1031,7 @@
                 if (realIndex > -1) {
                     logDatabase.splice(realIndex, 1);
                 }
+                saveLogsToStorage();
                 renderLogTable();
             };
             actionDiv.appendChild(deleteBtn);
@@ -976,26 +1074,28 @@
             let selectedItems = Array.from(checkedBoxes).map(cb => logDatabase[parseInt(cb.dataset.index)]);
             selectedItems.sort((a, b) => a.timestampEpoch - b.timestampEpoch);
 
-            const audioBlobs = selectedItems.map(item => item.audioBlob);
-            const combinedAudioBlob = await combineWavBlobs(audioBlobs);
-            const combinedArrayBuffer = await combinedAudioBlob.arrayBuffer();
-
-            let combinedText = "【結合された無線ログ】\n====================\n\n";
-            selectedItems.forEach(item => {
-                combinedText += `■ 検知日時: ${item.timestampStr} (録音: ${formatDuration(item.durationSec)})\n`;
-                combinedText += `${item.text || '（音声のみ）'}\n\n`;
-            });
-
             const zip = new JSZip();
-            const safeTimeStr = new Date().toISOString().replace(/[-:T]/g, '_').slice(0, 15);
-            zip.file(`combined_audio_${safeTimeStr}.wav`, combinedArrayBuffer);
-            zip.file(`combined_transcript_${safeTimeStr}.txt`, combinedText);
+            const safeZipTime = new Date().toISOString().replace(/[-:T]/g, '_').slice(0, 15);
+
+            selectedItems.forEach((item, idx) => {
+                const dateObj = new Date(item.timestampEpoch);
+                const fileNameTime = dateObj.getFullYear() + '-' +
+                    String(dateObj.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(dateObj.getDate()).padStart(2, '0') + '_' +
+                    String(dateObj.getHours()).padStart(2, '0') + '-' +
+                    String(dateObj.getMinutes()).padStart(2, '0') + '-' +
+                    String(dateObj.getSeconds()).padStart(2, '0');
+
+                zip.file(`${fileNameTime}.wav`, item.audioBlob);
+                const textContent = item.text || '（テキストなし）';
+                zip.file(`${fileNameTime}.txt`, textContent);
+            });
 
             const content = await zip.generateAsync({ type: "blob" });
             const downloadUrl = URL.createObjectURL(content);
             const a = document.createElement('a');
             a.href = downloadUrl;
-            a.download = `wireless_combined_logs_${safeTimeStr}.zip`;
+            a.download = `wireless_logs_${safeZipTime}.zip`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1009,7 +1109,7 @@
         }
     };
 
-    function addLogEntry(timestampEpoch, timestampStr, durationSec, text, audioBlob) {
+    function saveLogToStorage(timestampEpoch, timestampStr, durationSec, text, audioBlob) {
         const audioUrl = URL.createObjectURL(audioBlob);
         logDatabase.unshift({
             timestampEpoch,
@@ -1020,6 +1120,7 @@
             audioUrl
         });
         cleanOldLogs();
+        saveLogsToStorage();
     }
 
     function initSpeechRecognition() {
@@ -1081,7 +1182,7 @@
                 try { recognition.start(); } catch (e) {}
             }
 
-            statusBadge.textContent = '常時監視中';
+            statusBadge.textContent = '待機';
             statusBadge.classList.add('active');
             startBtn.disabled = true;
             stopBtn.disabled = false;
@@ -1104,12 +1205,12 @@
                 const nowEpoch = Date.now();
                 const durationSec = (nowEpoch - recordingStartTime) / 1000;
                 
-                if (durationSec >= 5.0) {
+                (durationSec >= 5.0) && (() => {
                     const timeStr = new Date(nowEpoch).toLocaleString();
                     const wavBlob = createWavBlob(activeRecordingChunks, sampleRate);
                     const finalRecordedText = currentTranscriptBuffer + interimTranscriptBuffer;
-                    addLogEntry(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
-                }
+                    saveLogToStorage(nowEpoch, timeStr, durationSec, finalRecordedText, wavBlob);
+                })();
             }
         }
 
@@ -1121,7 +1222,7 @@
             await audioContext.suspend();
         }
 
-        statusBadge.textContent = '待機中';
+        statusBadge.textContent = '待機';
         statusBadge.className = 'status';
         startBtn.disabled = false;
         stopBtn.disabled = true;
@@ -1129,6 +1230,7 @@
         meterFill.style.width = '0%';
     });
 
+    logDatabase = loadLogsFromStorage();
     cleanOldLogs();
 </script>
 
