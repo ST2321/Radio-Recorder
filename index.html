@@ -84,7 +84,6 @@
             gap: 10px;
             margin-bottom: 10px;
         }
-        /* 画面横幅を3分割：音量レベル(1fr)、空白(1fr)、音量バー(1fr)の構成 */
         .receive-grid {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
@@ -134,7 +133,6 @@
         button.secondary { background-color: #000000; color: #ffffff; border: 1px solid #ffffff; }
         button.secondary:hover { background-color: #ffffff; color: #000000; }
         
-        /* モニタ音声切替ボタン：「切」は黒背景、「入」は白背景 */
         button.monitor-btn {
             background-color: #000000;
             color: #ffffff;
@@ -333,7 +331,7 @@
         <button id="toggleSettingsBtn" class="secondary btn-sm">⚙️ 設定を表示</button>
     </header>
 
-    <!-- 設定パネル（折りたたみ式） -->
+    <!-- 設定パネル -->
     <div class="card collapsible-content" id="settingsCard">
         <h2>デバイス設定 & 制御</h2>
         <div class="settings-grid">
@@ -381,9 +379,7 @@
             <h2>受信</h2>
         </div>
         
-        <!-- 画面横幅を3等分（音量レベル、空白、音量バー）にし、ステータスを音量レベルの左側に配置 -->
         <div class="receive-grid">
-            <!-- 1列目：ステータス ＆ 入力音量レベル -->
             <div class="setting-group">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px;">
                     <label style="margin-bottom: 0;">入力音量レベル</label>
@@ -395,17 +391,14 @@
                 </div>
             </div>
 
-            <!-- 2列目：空白スペース -->
             <div></div>
 
-            <!-- 3列目：モニタ音量 -->
             <div class="setting-group">
                 <label for="monitorVolumeRange">モニタ音量: <span id="monitorVolumeValue">100%</span></label>
                 <div class="range-container">
                     <span>0%</span>
                     <input type="range" id="monitorVolumeRange" min="0" max="1" step="0.05" value="1">
                     <span>100%</span>
-                    <!-- モニタ音切替ボタン：「切」は黒背景、「入」は白背景 -->
                     <button id="monitorMuteBtn" class="monitor-btn btn-sm" style="min-width: 40px;">入</button>
                 </div>
             </div>
@@ -426,7 +419,6 @@
                 <button id="batchPlayBtn" class="btn-sm secondary" disabled>連続プレビュー</button>
                 <button id="batchDownloadBtn" class="btn-sm secondary" disabled>ZIPダウンロード</button>
             </div>
-            <!-- 音声再生プレビュー -->
             <div id="playerCard" class="player-panel-inline">
                 <div id="playerInfoText" class="player-info">選択ファイルなし</div>
                 <div class="player-controls">
@@ -524,7 +516,6 @@
     let soundThreshold = parseFloat(thresholdRange.value);
     const METER_SCALE_MAX = 0.3; 
 
-    // 設定パネルの表示切替
     toggleSettingsBtn.addEventListener('click', () => {
         const isOpen = settingsCard.classList.toggle('open');
         toggleSettingsBtn.textContent = isOpen ? '⚙️ 設定を隠す' : '⚙️ 設定を表示';
@@ -662,7 +653,6 @@
             }
         } else {
             if (isRecordingAudio && !silenceTimer) {
-                // 5秒間無音が続いた場合のタイマー
                 silenceTimer = setTimeout(() => {
                     if (isRecordingAudio) {
                         isRecordingAudio = false;
@@ -670,7 +660,6 @@
                         statusBadge.textContent = '待機';
                         statusBadge.className = 'status active';
 
-                        // 5秒間の無音分に相当するチャンクをカットする（後ろの5秒分を削って音声が途切れたところまでを保存）
                         const samplesPerSecond = sampleRate / 2048; 
                         const silenceCutCount = Math.round(samplesPerSecond * 5);
                         
@@ -696,7 +685,7 @@
                         activeRecordingChunks = [];
                         silenceTimer = null;
                     }
-                }, 5000); // 5秒間無音
+                }, 5000);
             }
         }
 
@@ -844,7 +833,7 @@
         audioPlayer.play().catch(e => alert('再生エラー'));
     }
 
-    const STORAGE_KEY = 'wireless_log_database_v10';
+    const STORAGE_KEY = 'wireless_log_database_v12';
 
     function loadLogsFromStorage() {
         try {
@@ -880,7 +869,9 @@
 
     function saveLogsToStorage() {
         try {
-            const minimalItemsPromises = logDatabase.map(item => {
+            // 容量圧迫を防ぐため、最新の最大20件程度に絞って保存する
+            const targetItems = logDatabase.slice(0, 20);
+            const minimalItemsPromises = targetItems.map(item => {
                 return new Promise((resolve) => {
                     if (!item.audioBlob) {
                         resolve(null);
@@ -903,7 +894,12 @@
 
             Promise.all(minimalItemsPromises).then(results => {
                 const validResults = results.filter(r => r !== null);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(validResults));
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(validResults));
+                } catch (storageErr) {
+                    // 容量オーバー時のフォールバック（さらに古いものを削るか警告）
+                    console.warn('LocalStorage容量超過の可能性:', storageErr);
+                }
             });
         } catch (e) {
             console.error('ストレージ保存エラー', e);
@@ -1333,7 +1329,7 @@
         meterFill.style.width = '0%';
     });
 
-    // 起動時に保存されたログを読み込んでテーブルに反映
+    // 起動時の初期化と読み込み
     logDatabase = loadLogsFromStorage();
     cleanOldLogs();
 </script>
