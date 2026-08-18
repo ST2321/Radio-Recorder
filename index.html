@@ -174,8 +174,9 @@
             display: none !important;
         }
 
+        /* レベルメーター（背景グラデーション固定 ＋ マスキング方式） */
         .meter-box {
-            background: #111111;
+            background: linear-gradient(to right, #3b82f6 0%, #22c55e 40%, #eab308 70%, #ef4444 100%);
             border-radius: 4px;
             height: 14px;
             width: 100%;
@@ -184,14 +185,14 @@
             position: relative;
             border: 1px solid var(--border-color);
         }
-        /* グラデーション位置は固定、幅（width）だけが可変で伸び縮みする仕様 */
-        .meter-fill {
-            background: linear-gradient(to right, #3b82f6, #22c55e, #eab308, #f97316, #ef4444);
-            height: 100%;
-            width: 0%;
+        /* マスク用カバー：音量が小さいときは右側を覆い隠し（幅を広く）、音が大きくなると右側へ縮んでグラデーションを表示させる */
+        .meter-mask {
             position: absolute;
-            left: 0;
             top: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            background-color: #111111;
             transition: width 0.05s linear;
         }
         .meter-threshold {
@@ -409,7 +410,8 @@
                     </div>
                 </div>
                 <div class="meter-box" style="width: 100%;">
-                    <div id="meterFill" class="meter-fill"></div>
+                    <!-- 背景グラデーションを隠すマスクカバー（右側から縮んで音量を表示） -->
+                    <div id="meterMask" class="meter-mask"></div>
                     <div id="meterThreshold" class="meter-threshold" style="left: 0%;"></div>
                 </div>
             </div>
@@ -502,10 +504,9 @@
     let currentSortAscending = true;
     let db = null;
 
-    // IndexedDB初期化（大容量データの永続保存）
     function initIndexedDB() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open('WirelessLogDB_v5', 1);
+            const request = indexedDB.open('WirelessLogDB_v6', 1);
             request.onerror = () => reject(request.error);
             request.onsuccess = () => {
                 db = request.result;
@@ -594,7 +595,7 @@
 
     const thresholdRange = document.getElementById('thresholdRange');
     const thresholdValue = document.getElementById('thresholdValue');
-    const meterFill = document.getElementById('meterFill');
+    const meterMask = document.getElementById('meterMask');
     const meterThreshold = document.getElementById('meterThreshold');
     
     const monitorVolumeRange = document.getElementById('monitorVolumeRange');
@@ -604,7 +605,6 @@
     let soundThreshold = parseFloat(thresholdRange.value);
     const METER_SCALE_MAX = 0.3; 
 
-    // 状態更新とUIの同期管理
     function updateSystemStateUI() {
         const isMicAllowed = mediaStream !== null;
         
@@ -746,7 +746,8 @@
         let rms = Math.sqrt(sum / chunkCopy.length);
 
         let percent = Math.min((rms / METER_SCALE_MAX) * 100, 100);
-        meterFill.style.width = `${percent}%`;
+        // マスク幅：100%から現在の音量パーセンテージを引くことで、音量部分だけ背景グラデーションが見えるようにする
+        meterMask.style.width = `${100 - percent}%`;
 
         preBuffer.push(chunkCopy);
         if (preBuffer.length > 45) {
@@ -947,7 +948,7 @@
         audioPlayer.play().catch(e => alert('再生エラー'));
     }
 
-    const STORAGE_META_KEY = 'wireless_log_metadata_v17';
+    const STORAGE_META_KEY = 'wireless_log_metadata_v18';
 
     async function loadLogsFromStorage() {
         try {
@@ -974,13 +975,10 @@
                             audioUrl: audioUrl
                         });
                     }
-                } catch (err) {
-                    // skip
-                }
+                } catch (err) {}
             }
             return loadedLogs;
         } catch (e) {
-            console.error('ストレージ読み込みエラー', e);
             return [];
         }
     }
@@ -994,9 +992,7 @@
                 text: item.text
             }));
             localStorage.setItem(STORAGE_META_KEY, JSON.stringify(minimalItems));
-        } catch (e) {
-            console.error('メタデータ保存エラー', e);
-        }
+        } catch (e) {}
     }
 
     async function cleanOldLogs() {
@@ -1230,7 +1226,6 @@
         updateBatchButtonStates();
     }
 
-    // 録音日時の数字フォーマット関数 (例: 20260606_123000)
     function getNumericTimestampFilename(epoch) {
         const d = new Date(epoch);
         const yyyy = d.getFullYear();
@@ -1242,7 +1237,6 @@
         return `${yyyy}${mm}${dd}_${hh}${min}${ss}`;
     }
 
-    // 選択された音声をZIPフォルダにまとめて一括ダウンロード
     batchDownloadBtn.onclick = async () => {
         const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
         if (checkedBoxes.length === 0) return;
@@ -1274,7 +1268,6 @@
             URL.revokeObjectURL(downloadUrl);
 
         } catch (err) {
-            console.error(err);
             alert('ZIPファイルの作成中にエラーが発生しました。');
         } finally {
             batchDownloadBtn.disabled = false;
@@ -1328,7 +1321,6 @@
             }
         };
 
-        // 途切れたり停止した場合に即座に再起動して認識漏れを防ぐ
         rec.onend = () => {
             if (isRunning) {
                 try {
@@ -1344,7 +1336,6 @@
         };
 
         rec.onerror = (event) => {
-            // エラー時も自動で継続を試みる
             if (isRunning && event.error !== 'not-allowed') {
                 try {
                     rec.abort();
@@ -1416,17 +1407,15 @@
         startBtn.disabled = false;
         stopBtn.disabled = true;
         liveTranscription.textContent = '';
-        meterFill.style.width = '0%';
+        meterMask.style.width = '100%';
         updateSystemStateUI();
     });
 
-    // 起動時の初期化と自動クリーンアップ（3日経過データの削除）
     initIndexedDB().then(async () => {
         logDatabase = await loadLogsFromStorage();
         await cleanOldLogs();
         updateSystemStateUI();
     }).catch(err => {
-        console.error('IndexedDB初期化失敗', err);
         updateSystemStateUI();
     });
 </script>
