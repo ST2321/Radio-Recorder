@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>無線受信記録ソフト（IndexedDB永続保存版）</title>
-    <!-- JSZipライブラリ（一括ZIPダウンロード用） -->
+    <title>無線受信記録ソフト</title>
+    <!-- JSZipライブラリの読み込み（ZIP作成用） -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
@@ -160,9 +160,20 @@
             min-width: 50px;
         }
         .status.active { background-color: #000000; color: #ffffff; border-color: #ffffff; }
+        .status.unauthorized { background-color: #ff4d4d; color: #ffffff; border-color: #ff4d4d; }
         .status.recording { background-color: #000000; color: #ff4d4d; border-color: #ff4d4d; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
         
+        .unauthorized-actions {
+            display: inline-flex;
+            gap: 6px;
+            margin-left: 10px;
+            align-items: center;
+        }
+        .unauthorized-actions.hidden {
+            display: none !important;
+        }
+
         .meter-box {
             background: #111111;
             border-radius: 4px;
@@ -382,8 +393,15 @@
         <div class="receive-grid">
             <div class="setting-group">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px;">
-                    <label style="margin-bottom: 0;">入力音量レベル</label>
-                    <span id="statusBadge" class="status">待機</span>
+                    <div style="display: flex; align-items: center;">
+                        <label style="margin-bottom: 0; margin-right: 6px;">入力音量レベル</label>
+                        <span id="statusBadge" class="status unauthorized">未許可</span>
+                        <!-- 未許可状態の時のみ表示されるクイック操作ボタン -->
+                        <div id="unauthorizedActions" class="unauthorized-actions">
+                            <button id="quickInitBtn" class="btn-sm">マイク接続許可</button>
+                            <button id="quickStartBtn" class="btn-sm" style="display:none;">自動録音開始</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="meter-box" style="width: 100%;">
                     <div id="meterFill" class="meter-fill"></div>
@@ -416,8 +434,7 @@
         
         <div class="batch-actions" style="margin-top: 8px;">
             <div class="batch-left">
-                <button id="batchPlayBtn" class="btn-sm secondary" disabled>連続プレビュー</button>
-                <button id="batchDownloadBtn" class="btn-sm secondary" disabled>ZIPダウンロード</button>
+                <button id="batchDownloadBtn" class="btn-sm secondary" disabled>ダウンロード</button>
             </div>
             <div id="playerCard" class="player-panel-inline">
                 <div id="playerInfoText" class="player-info">選択ファイルなし</div>
@@ -483,7 +500,7 @@
     // IndexedDB初期化（大容量データの永続保存）
     function initIndexedDB() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open('WirelessLogDB_v3', 1);
+            const request = indexedDB.open('WirelessLogDB_v4', 1);
             request.onerror = () => reject(request.error);
             request.onsuccess = () => {
                 db = request.result;
@@ -547,6 +564,10 @@
     const initBtn = document.getElementById('initBtn');
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
+    const quickInitBtn = document.getElementById('quickInitBtn');
+    const quickStartBtn = document.getElementById('quickStartBtn');
+    const unauthorizedActions = document.getElementById('unauthorizedActions');
+    
     const audioSourceSelect = document.getElementById('audioSource');
     const audioOutputSelect = document.getElementById('audioOutput');
     const statusBadge = document.getElementById('statusBadge');
@@ -554,7 +575,6 @@
     const logTableBody = document.getElementById('logTableBody');
     const emptyRow = document.getElementById('emptyRow');
     const selectAllCheckbox = document.getElementById('selectAllCheckbox');
-    const batchPlayBtn = document.getElementById('batchPlayBtn');
     const batchDownloadBtn = document.getElementById('batchDownloadBtn');
     const clearAllDataBtn = document.getElementById('clearAllDataBtn');
     
@@ -578,6 +598,29 @@
 
     let soundThreshold = parseFloat(thresholdRange.value);
     const METER_SCALE_MAX = 0.3; 
+
+    // 状態更新とUIの同期管理
+    function updateSystemStateUI() {
+        const isMicAllowed = mediaStream !== null;
+        
+        if (!isMicAllowed) {
+            statusBadge.textContent = '未許可';
+            statusBadge.className = 'status unauthorized';
+            unauthorizedActions.classList.remove('hidden');
+            quickInitBtn.style.display = 'inline-block';
+            quickStartBtn.style.display = 'none';
+        } else if (!isRunning) {
+            statusBadge.textContent = '未許可';
+            statusBadge.className = 'status unauthorized';
+            unauthorizedActions.classList.remove('hidden');
+            quickInitBtn.style.display = 'none';
+            quickStartBtn.style.display = 'inline-block';
+        } else {
+            statusBadge.textContent = '待機';
+            statusBadge.className = 'status active';
+            unauthorizedActions.classList.add('hidden');
+        }
+    }
 
     toggleSettingsBtn.addEventListener('click', () => {
         const isOpen = settingsCard.classList.toggle('open');
@@ -619,7 +662,7 @@
     });
     monitorMuteBtn.classList.add('active');
 
-    initBtn.addEventListener('click', async () => {
+    async function handleInitializeMic() {
         try {
             mediaStream = await navigator.mediaDevices.getUserMedia({ 
                 audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } 
@@ -650,13 +693,16 @@
                 recognition = initSpeechRecognition();
             }
 
-            statusBadge.textContent = '待機';
             initBtn.disabled = true;
             startBtn.disabled = false;
+            updateSystemStateUI();
         } catch (err) {
             alert('マイク許可エラー');
         }
-    });
+    }
+
+    initBtn.addEventListener('click', handleInitializeMic);
+    quickInitBtn.addEventListener('click', handleInitializeMic);
 
     async function updateDeviceLists() {
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -853,7 +899,7 @@
 
     audioPlayer.ontimeupdate = () => {
         if (!isNaN(audioPlayer.duration)) {
-            currentTimeDisplay.textContent = formatTimeCode(audioPlayer.currentTime);
+            currentTimeDisplay.textContent = formatTimeCode(audioPlayer.duration);
             seekSlider.value = (audioPlayer.currentTime / audioPlayer.duration) * 100;
         }
     };
@@ -896,7 +942,7 @@
         audioPlayer.play().catch(e => alert('再生エラー'));
     }
 
-    const STORAGE_META_KEY = 'wireless_log_metadata_v15';
+    const STORAGE_META_KEY = 'wireless_log_metadata_v16';
 
     async function loadLogsFromStorage() {
         try {
@@ -989,7 +1035,6 @@
     function updateBatchButtonStates() {
         const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
         const hasChecked = checkedBoxes.length > 0;
-        batchPlayBtn.disabled = !hasChecked;
         batchDownloadBtn.disabled = !hasChecked;
     }
 
@@ -1180,68 +1225,60 @@
         updateBatchButtonStates();
     }
 
-    batchPlayBtn.onclick = () => {
-        const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
-        if (checkedBoxes.length === 0) return;
+    // 録音日時の数字フォーマット関数 (例: 20260606_123000)
+    function getNumericTimestampFilename(epoch) {
+        const d = new Date(epoch);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const hh = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        const ss = String(d.getSeconds()).padStart(2, '0');
+        return `${yyyy}${mm}${dd}_${hh}${min}${ss}`;
+    }
 
-        let selectedItems = Array.from(checkedBoxes).map(cb => logDatabase[parseInt(cb.dataset.index)]);
-        selectedItems.sort((a, b) => a.timestampEpoch - b.timestampEpoch);
-
-        const queue = selectedItems.map(item => ({
-            url: item.audioUrl,
-            title: `${item.timestampStr} (${formatDuration(item.durationSec)})`
-        }));
-
-        if (queue.length > 0) {
-            const first = queue.shift();
-            window.playlistQueue = queue;
-            loadAndPlayAudio(first.url, first.title, 0);
-        }
-    };
-
+    // 選択された音声をZIPフォルダにまとめて一括ダウンロード
     batchDownloadBtn.onclick = async () => {
         const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
         if (checkedBoxes.length === 0) return;
 
-        batchDownloadBtn.disabled = true;
-        batchDownloadBtn.textContent = '作成中...';
-
+        let selectedItems = Array.from(checkedBoxes).map(cb => logDatabase[parseInt(cb.dataset.index)]);
+        
         try {
-            let selectedItems = Array.from(checkedBoxes).map(cb => logDatabase[parseInt(cb.dataset.index)]);
-            selectedItems.sort((a, b) => a.timestampEpoch - b.timestampEpoch);
+            batchDownloadBtn.disabled = true;
+            batchDownloadBtn.textContent = 'ZIPファイルを作成中...';
 
             const zip = new JSZip();
-            const safeZipTime = new Date().toISOString().replace(/[-:T]/g, '_').slice(0, 15);
+            // ZIPファイル内に「wireless_records」という名前のフォルダを作成
+            const folderName = `wireless_records_${getNumericTimestampFilename(Date.now())}`;
+            const folder = zip.folder(folderName);
 
-            selectedItems.forEach((item, idx) => {
-                const dateObj = new Date(item.timestampEpoch);
-                const fileNameTime = dateObj.getFullYear() + '-' +
-                    String(dateObj.getMonth() + 1).padStart(2, '0') + '-' +
-                    String(dateObj.getDate()).padStart(2, '0') + '_' +
-                    String(dateObj.getHours()).padStart(2, '0') + '-' +
-                    String(dateObj.getMinutes()).padStart(2, '0') + '-' +
-                    String(dateObj.getSeconds()).padStart(2, '0');
-
-                zip.file(`${fileNameTime}.wav`, item.audioBlob);
-                const textContent = item.text || '（テキストなし）';
-                zip.file(`${fileNameTime}.txt`, textContent);
+            // 選択された音声をフォルダ内に追加
+            selectedItems.forEach(item => {
+                const fileName = `${getNumericTimestampFilename(item.timestampEpoch)}.wav`;
+                folder.file(fileName, item.audioBlob);
             });
 
-            const content = await zip.generateAsync({ type: "blob" });
+            // ZIPアーカイブを生成
+            const content = await zip.generateAsync({ type: 'blob' });
+
+            // ダウンロードリンクを生成して発火
             const downloadUrl = URL.createObjectURL(content);
             const a = document.createElement('a');
             a.href = downloadUrl;
-            a.download = `wireless_logs_${safeZipTime}.zip`;
+            a.download = `${folderName}.zip`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(downloadUrl);
 
+            alert('音声ファイルをまとめたZIPフォルダのダウンロードが完了しました！');
         } catch (err) {
-            alert('ダウンロードエラー');
+            console.error(err);
+            alert('ZIPファイルの作成中にエラーが発生しました。');
         } finally {
             batchDownloadBtn.disabled = false;
-            batchDownloadBtn.textContent = 'ZIPダウンロード';
+            batchDownloadBtn.textContent = 'ダウンロード';
         }
     };
 
@@ -1303,7 +1340,7 @@
         return rec;
     }
 
-    startBtn.addEventListener('click', async () => {
+    async function handleStartRecording() {
         try {
             if (!audioContext) {
                 alert("マイク接続許可を押してください。");
@@ -1319,15 +1356,17 @@
                 try { recognition.start(); } catch (e) {}
             }
 
-            statusBadge.textContent = '待機';
-            statusBadge.classList.add('active');
             startBtn.disabled = true;
             stopBtn.disabled = false;
+            updateSystemStateUI();
 
         } catch (err) {
             alert('開始エラー');
         }
-    });
+    }
+
+    startBtn.addEventListener('click', handleStartRecording);
+    quickStartBtn.addEventListener('click', handleStartRecording);
 
     stopBtn.addEventListener('click', async () => {
         isRunning = false;
@@ -1359,20 +1398,21 @@
             await audioContext.suspend();
         }
 
-        statusBadge.textContent = '待機';
-        statusBadge.className = 'status';
         startBtn.disabled = false;
         stopBtn.disabled = true;
         liveTranscription.textContent = '';
         meterFill.style.width = '0%';
+        updateSystemStateUI();
     });
 
     // 起動時の初期化と自動クリーンアップ（3日経過データの削除）
     initIndexedDB().then(async () => {
         logDatabase = await loadLogsFromStorage();
         await cleanOldLogs();
+        updateSystemStateUI();
     }).catch(err => {
         console.error('IndexedDB初期化失敗', err);
+        updateSystemStateUI();
     });
 </script>
 
