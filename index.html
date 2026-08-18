@@ -670,7 +670,7 @@
                         statusBadge.textContent = '待機';
                         statusBadge.className = 'status active';
 
-                        // 無音検知が確定した時点で、後ろの5秒間の無音分に相当するチャンクをカットして保存する
+                        // 5秒間の無音分に相当するチャンクをカットする（後ろの5秒分を削って音声が途切れたところまでを保存）
                         const samplesPerSecond = sampleRate / 2048; 
                         const silenceCutCount = Math.round(samplesPerSecond * 5);
                         
@@ -680,7 +680,7 @@
                         }
 
                         const nowEpoch = Date.now();
-                        const durationSec = (nowEpoch - recordingStartTime) / 1000 - 5; // 表示上の尺も5秒引く
+                        const durationSec = (nowEpoch - recordingStartTime) / 1000 - 5; 
                         
                         if (durationSec >= 0.5 && finalChunks.length > 0) {
                             const timeStr = new Date(nowEpoch).toLocaleString();
@@ -844,7 +844,7 @@
         audioPlayer.play().catch(e => alert('再生エラー'));
     }
 
-    const STORAGE_KEY = 'wireless_log_database_v9';
+    const STORAGE_KEY = 'wireless_log_database_v10';
 
     function loadLogsFromStorage() {
         try {
